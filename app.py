@@ -14,7 +14,7 @@ from utils.database import (
     upsert_client, delete_client,
     save_project, get_projects, get_project_by_id,
     submit_for_approval, approve_project, reject_project, get_pending_approvals,
-    set_user_role
+    set_user_role, generate_project_code
 )
 from utils.generate import (
     generate_confirmation_letter, generate_invoice,
@@ -322,7 +322,15 @@ def page_generate():
         st.caption(f"📋 {client_info['full_name']}  |  联系人: {client_info['contact']}  |  {phone_email}")
 
         application_date = st.date_input("申请日期 *", value=datetime.now())
-        project_code = st.text_input("项目编号 *", placeholder="WELL20260701001")
+        code_date = st.date_input("编号日期（用于生成项目编号）", value=datetime.now(),
+                                  help="格式：WELL+YYMMDD+序号。如下月项目请改日期。")
+        # Preview and editable project code
+        date_str_val = code_date.strftime('%y%m%d')
+        preview_code = f"WELL{date_str_val}XX"
+        project_code = st.text_input("项目编号 *", value=preview_code, placeholder="WELL20260701001",
+                                     help=f"默认自动生成，可直接修改。确认后序号为当月实际序号。")
+        # Show hint
+        st.caption(f"💡 输入框默认值可修改。提交时会自动将 XX 替换为当月实际序号。")
         project_name = st.text_input("项目名称 *", placeholder="品牌名 – 月份UGC 篇数")
         brand_name = st.text_input("客户品牌名 *", placeholder="品牌的社交媒体名")
         currency = st.selectbox("币种", ["USD", "RMB"], index=0)
@@ -352,6 +360,10 @@ def page_generate():
             if not all([project_code, project_name, brand_name, amount > 0]):
                 st.error("请填写所有带 * 的必填项")
             else:
+                # Auto-generate if user left default (contains XX), else use as-is
+                if "XX" in project_code or "xx" in project_code:
+                    project_code = generate_project_code(code_date.strftime("%Y-%m-%d"))
+                # else: use user's manually entered code
                 # Build project dict for generation
                 proj = {
                     'client_short': selected_client,
@@ -493,8 +505,13 @@ def page_finance():
             col1, col2 = st.columns([3, 1])
             with col1:
                 st.markdown(f"**{p['brand_name']}** — {p['project_name']}")
+                cost_info = ""
+                if p.get('estimated_cost'):
+                    cost_info = f" | 成本: {p.get('cost_currency','USD')} {p['estimated_cost']:,.2f}"
+                    if p.get('cost_breakdown'):
+                        cost_info += f" ({p['cost_breakdown'][:50]})"
                 st.caption(f"编号: {p['project_code']} | 客户: {p['client_short']} | "
-                          f"金额: {p.get('currency','USD')} {p['amount']:,.2f} | "
+                          f"金额: {p.get('currency','USD')} {p['amount']:,.2f}{cost_info} | "
                           f"提交人: {p.get('created_by_name','?')} | "
                           f"提交时间: {p['created_at']}")
 
@@ -561,22 +578,55 @@ def page_finance():
             st.session_state['just_approved'] = None
             st.rerun()
 
+    # Payment tracking: approved projects with cost info
+    st.divider()
+    st.subheader("💰 已通过项目 & 到账跟踪")
+    all_projects = get_projects(limit=200)
+    approved = [p for p in all_projects if p.get('status') == 'approved']
+    if approved:
+        import pandas as pd
+        rows = []
+        for p in approved:
+            rows.append({
+                '项目编号': p.get('project_code',''),
+                '品牌': p.get('brand_name',''),
+                '客户': p.get('client_short',''),
+                '项目金额': f"{p.get('currency','USD')} {p.get('amount',0):,.0f}",
+                '预估成本': f"{p.get('cost_currency','USD')} {p.get('estimated_cost',0):,.0f}",
+                '成本构成': (p.get('cost_breakdown','') or '')[:60],
+                '提交时间': (p.get('created_at','') or '')[:10],
+                '已到账': '✅' if p.get('payment_received') else '⏳',
+                '到账日期': str(p.get('received_date',''))[:10] if p.get('received_date') else '',
+            })
+        df = pd.DataFrame(rows)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+        # Mark as received
+        st.subheader("标记到账")
+        not_received = [p for p in approved if not p.get('payment_received')]
+        if not_received:
+            col_a, col_b, col_c = st.columns([3, 1, 1])
+            with col_a:
+                proj_options = {f"{p['project_code']} - {p['brand_name']} ({p.get('currency','USD')} {p.get('amount',0):,.0f})": p for p in not_received}
+                selected = st.selectbox("选择项目", list(proj_options.keys()), key="rcv_select")
+            with col_b:
+                rcv_date = st.date_input("到账日期", value=datetime.now(), key="rcv_date")
+            with col_c:
+                rcv_amount = st.number_input("到账金额", min_value=0.0, value=0.0, step=100.0, key="rcv_amount")
+                if st.button("✅ 标记到账", type="primary", use_container_width=True):
+                    p = proj_options[selected]
+                    sb = get_connection()
+                    sb.table("projects").update({
+                        "payment_received": True,
+                        "received_date": rcv_date.strftime("%Y-%m-%d"),
+                        "received_amount": rcv_amount or p.get('amount', 0)
+                    }).eq("id", p['id']).execute()
+                    st.success(f"已标记 {p['brand_name']} 到账！")
+                    st.rerun()
+
     # History of approved/rejected
     st.divider()
     st.subheader("审核历史")
-    all_projects = get_projects(limit=200)
-    approved_rejected = [p for p in all_projects if p.get('status') in ('approved', 'rejected')]
-    if approved_rejected:
-        for p in approved_rejected[:20]:
-            status_icon = "✅" if p['status'] == 'approved' else "❌"
-            st.write(f"{status_icon} {p['brand_name']} — {p['project_code']} — {p['created_at'][:10]}")
-            if p.get('stamped_pdf_path') and os.path.exists(p['stamped_pdf_path']):
-                with open(p['stamped_pdf_path'], "rb") as f:
-                    st.download_button(
-                        f"📥 下载盖章 PDF", f,
-                        file_name=os.path.basename(p['stamped_pdf_path']),
-                        key=f"stamped_{p['id']}"
-                    )
 
 
 # ============================================================

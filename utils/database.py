@@ -246,6 +246,24 @@ def reject_project(project_id: int, finance_user_id: int) -> bool:
     return True
 
 
+def generate_project_code(code_date: str) -> str:
+    """
+    Generate next project code: WELL + YYMMDD + XX (2-digit sequence).
+    code_date: 'YYYY-MM-DD' format.
+    Returns: e.g., 'WELL26071501'
+    """
+    sb = _get_sb()
+    # Parse date
+    from datetime import datetime as dt
+    d = dt.strptime(code_date, "%Y-%m-%d")
+    prefix = f"WELL{d.strftime('%y%m%d')}"
+
+    # Count existing projects with this prefix
+    result = sb.table("projects").select("id", count="exact").like("project_code", f"{prefix}%").execute()
+    seq = (result.count or 0) + 1
+    return f"{prefix}{seq:02d}"
+
+
 def get_pending_approvals() -> List[Dict]:
     sb = _get_sb()
     result = sb.table("projects").select("*, clients(short_name, full_name), creator:created_by(username)").eq("status", "pending").order("created_at", desc=True).execute()
