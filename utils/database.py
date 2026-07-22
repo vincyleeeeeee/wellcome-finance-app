@@ -7,8 +7,22 @@ from typing import Optional, Tuple, List, Dict, Any
 
 from supabase import create_client
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+
+def _get_config():
+    """Get Supabase config from Streamlit secrets or env vars."""
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets'):
+            url = st.secrets.get('SUPABASE_URL', '')
+            key = st.secrets.get('SUPABASE_KEY', '')
+            if url and key:
+                return url, key
+    except Exception:
+        pass
+    return os.environ.get("SUPABASE_URL", ""), os.environ.get("SUPABASE_KEY", "")
+
+
+SUPABASE_URL, SUPABASE_KEY = _get_config()
 
 _supabase = None
 
