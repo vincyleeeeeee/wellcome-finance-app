@@ -7,9 +7,8 @@ from typing import Optional, Tuple, List, Dict, Any
 
 from supabase import create_client
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://iadfdtpjnemswwtnkygj.supabase.co")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhZGZkdHBqbmVtc3d3dG5reWdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3MTA4NzAsImV4cCI6MjEwMDI4Njg3MH0.nWMuVuT80fNKujtl7Cgrojx2uD55Oe8URGLdfo1FxGo")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
 _supabase = None
 

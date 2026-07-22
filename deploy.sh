@@ -26,7 +26,7 @@ gh auth login
 # 3. Create repo
 echo ""
 echo "📁 创建 GitHub 仓库..."
-gh repo create wellcome-finance-app --public --source=. --remote=origin --push
+gh repo create wellcome-finance-app --private --source=. --remote=origin --push
 
 echo ""
 echo "========================================"
