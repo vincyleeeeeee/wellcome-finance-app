@@ -99,8 +99,10 @@ def _dt(val):
 def _overlay_stamp(pdf_path: str, output_path: str):
     """Overlay stamp at Name/Signature area (left side)."""
     for p in [
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), "stamp", "stamp_500.png"),
-        "/Users/vincy/Documents/Wellcome/invoice-app/stamp/stamp_500.png",
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "stamp", "stamp_hq.png"),
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "stamp", "stamp_final.png"),
+        "/Users/vincy/Documents/Wellcome/invoice-app/stamp/stamp_hq.png",
+        "/Users/vincy/Documents/Wellcome/invoice-app/stamp/stamp_final.png",
     ]:
         if os.path.exists(p):
             stamp_file = p
@@ -117,9 +119,9 @@ def _overlay_stamp(pdf_path: str, output_path: str):
     ratio = stamp_w / stamp_img.width
     stamp_h = stamp_img.height * ratio
 
-    # At rows 15-16 area: right side, ~15-25% from bottom
-    x = int(pw * 0.55) + random.randint(-15, 15)
-    y = int(ph * 0.22) + random.randint(-10, 10)
+    # Above Name area: center-right, ~50% from top
+    x = int(pw * 0.50) + random.randint(-15, 15)
+    y = int(ph * 0.45) + random.randint(-10, 10)
     stamp_r = stamp_img.resize((int(stamp_w), int(stamp_h)), PILImage.LANCZOS)
 
     buf = io.BytesIO()

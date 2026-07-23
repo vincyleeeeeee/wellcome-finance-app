@@ -204,6 +204,7 @@ def save_project(project_data: dict) -> int:
         "estimated_cost": project_data.get("estimated_cost", 0),
         "cost_currency": project_data.get("cost_currency", "USD"),
         "cost_breakdown": project_data.get("cost_breakdown", ""),
+        "feishu_approved": project_data.get("feishu_approved", False),
         "expected_payment_date": project_data.get("expected_payment_date"),
         "created_by": project_data["created_by"],
     }).execute()
