@@ -67,7 +67,7 @@ def page_overview():
             '到账': paid,
         }
 
-        # Parse cost breakdown: split into individual items
+        # Parse cost breakdown
         try:
             import json
             cost_items = json.loads(p.get('cost_breakdown', '') or '[]')
@@ -75,13 +75,16 @@ def page_overview():
             cost_items = []
 
         if cost_items:
-            for item in cost_items:
+            for idx, item in enumerate(cost_items):
                 row = dict(base)
+                if idx > 0:
+                    # Only show project info on first row (visual merge)
+                    for k in ['阶段', '编号', '品牌', '客户', '金额', '结案', '到账']:
+                        row[k] = ''
                 row['成本细项'] = item.get('name', '')
                 row['成本金额'] = f"{item.get('currency','RMB')} {item.get('amount',0):,.0f}"
                 rows.append(row)
         else:
-            # No cost items: show one row with empty cost
             row = dict(base)
             row['成本细项'] = ''
             row['成本金额'] = f"RMB {p.get('estimated_cost',0):,.0f}" if p.get('estimated_cost') else '-'

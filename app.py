@@ -527,9 +527,9 @@ def page_history():
     if rejected_mine:
         for rp in rejected_mine:
             st.warning(f"⚠️ 你的项目 **{rp.get('brand_name','')}** ({rp.get('project_code','')}) 已被驳回，请修改后重新提交")
-            if st.button("📤 重新提交", key=f"resubmit_{rp['id']}"):
-                submit_for_approval(rp['id'])
-                st.success(f"已重新提交 {rp.get('project_code','')}")
+            if st.button("📤 修改并重新提交", key=f"resubmit_{rp['id']}"):
+                st.session_state['edit_project_id'] = rp['id']
+                st.session_state.page = "generate"
                 st.rerun()
 
     # Filter: show my projects or all
