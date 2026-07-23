@@ -57,12 +57,26 @@ def _num_to_chinese(n: int) -> str:
     return result
 
 
-def _amount_chinese(amount: int, currency: str = "USD") -> str:
-    """Get Chinese uppercase amount string with currency suffix."""
-    cn = _num_to_chinese(amount)
-    if currency == "RMB":
-        return f"{cn}元整"
-    return f"{cn}元整"
+def _amount_chinese(amount: float, currency: str = "USD") -> str:
+    """Get Chinese uppercase amount with 整 suffix. Handles decimals."""
+    integer_part = int(amount)
+    decimal_part = int(round((amount - integer_part) * 100))
+
+    cn = _num_to_chinese(integer_part)
+    result = f"{cn}元"
+
+    if decimal_part > 0:
+        jiao = decimal_part // 10
+        fen = decimal_part % 10
+        if jiao > 0:
+            result += f"{_CN_DIGITS[jiao]}角"
+        if fen > 0:
+            result += f"{_CN_DIGITS[fen]}分"
+        result += "整"
+    else:
+        result += "整"
+
+    return result
 
 
 def generate_confirmation_letter(client: dict, project: dict) -> str:
@@ -164,9 +178,9 @@ def generate_invoice(client: dict, project: dict) -> str:
     ws['G15'] = amount
 
     # Description
-    cn_amount = _amount_chinese(int(amount), currency)
+    cn_amount = _amount_chinese(amount, currency)
     ws['C16'] = "項目「   服务      」款\nltem \"Service'"
-    ws['C18'] = f"總付款金額為{cn_amount}\nFull payment of {currency_label}, {amount:,}"
+    ws['C18'] = f"總付款金額為{cn_amount}\nFull payment of {currency_label} {amount:,.2f}"
 
     wb.save(output_path)
     return output_path
@@ -181,23 +195,13 @@ def generate_email_confirmation(project: dict) -> Tuple[str, str, str]:
     currency_symbol = "¥" if currency == "RMB" else "$"
     amount_display = f"{currency_symbol}{project['amount']:,}"
 
-    subject = f"请确认：{project['brand_name']} {project['project_name']} 合作细节 / {project['project_code']}"
+    subject = f"Confirmation Letter for Review — {project['brand_name']} {project['project_name']} / {project['project_code']}"
 
-    body = f"""感谢您确认与我司就 **【{project['brand_name']} {project['project_name']}】** 开展合作。为推进后续执行，现将双方沟通确认的活动细节汇总如下：
+    body = f"""Dear all,
 
-**【合作细节】**
-- 合作内容：{project.get('content_type', 'UGC铺量')}
-- 内容数量：{project['total_posts']}
-- 合作费用：{amount_display}
-- 发布平台：{project.get('platform', '小红书')}
-- 执行周期：{project['execution_period']}
-
-**【付款安排】**
-以上细节无误后，我们将开具 INVOICE。
-
-请您回复本邮件确认以下两点：
-1. 上述活动细节无误；
-2. 贵方可预期的付款时间（或时间范围）。"""
+Please kindly find the attached confirmation document for your review.
+If there are any comments or adjustments needed, please feel free to let us know.
+Thank you, and we look forward to your confirmation."""
 
     return subject, body
 
@@ -209,20 +213,15 @@ def generate_email_invoice(project: dict) -> Tuple[str, str, str]:
     """
     currency = project.get('currency', 'USD')
     currency_symbol = "¥" if currency == "RMB" else "$"
-    amount_display = f"{currency_symbol}{project['amount']:,}"
+    amount_display = f"{currency_symbol}{project['amount']:,.2f}"
 
-    subject = f"Invoice 请查收 — {project['brand_name']} {project['project_name']} / {project['project_code']}"
+    subject = f"Invoice for {project['brand_name']} {project['project_name']} / {project['project_code']}"
 
-    body = f"""附件为本项目 Invoice，请查收。
+    body = f"""Dear all,
 
-| 项目 | 内容 |
-|------|------|
-| Invoice No. | {project['project_code']} |
-| 项目 | {project['project_name']} |
-| 金额 | {currency} {amount_display} |
-| 到期日 | {project['due_date']} |
-
-请于到期日前安排付款，如有疑问请随时联系。谢谢！"""
+Please find attached the invoice for {project['brand_name']} {project['project_name']} Project.
+Please review the invoice at your convenience and let us know if you have any questions.
+Thank you for your kind attention."""
 
     return subject, body
 
