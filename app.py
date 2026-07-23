@@ -100,6 +100,9 @@ def render_sidebar():
         if st.button("📋 项目历史", use_container_width=True,
                      type="primary" if st.session_state.page == "history" else "secondary"):
             st.session_state.page = "history"
+        if st.button("📝 项目立项", use_container_width=True,
+                     type="primary" if st.session_state.page == "proposal" else "secondary"):
+            st.session_state.page = "proposal"
 
         # Finance users see approval + receipt pages
         if user['role'] in ('finance', 'admin'):
@@ -361,7 +364,10 @@ def page_generate():
         platform = st.text_input("发布平台", value="小红书",
                                  help="邮件中使用，默认小红书")
         only_invoice = st.checkbox("只要 Invoice（不生成确认函）", value=False)
+        only_confirmation = st.checkbox("只要确认函（不生成 Invoice）", value=False)
         submit_approval = st.checkbox("生成后提交财务审核", value=True)
+        expected_payment_date = st.date_input("预计客户到账时间", value=None,
+                                              help="客户的预计付款日期，用于财务跟踪")
         estimated_cost = st.number_input("预估成本金额", min_value=0.0, step=100.0, value=0.0)
         cost_currency = st.selectbox("成本币种", ["USD", "RMB"], key="cost_currency")
         cost_breakdown = st.text_area("成本构成", placeholder="如：KOL费用 2000, 拍摄 500, 剪辑 300...")
@@ -393,6 +399,7 @@ def page_generate():
                     'estimated_cost': estimated_cost,
                     'cost_currency': cost_currency,
                     'cost_breakdown': cost_breakdown,
+                    'expected_payment_date': expected_payment_date.strftime('%Y-%m-%d') if expected_payment_date else None,
                     'created_by': st.session_state.user['id'],
                     'client_id': client_info['id'],
                 }
@@ -407,8 +414,9 @@ def page_generate():
                         )
                         files['确认函'] = conf_path
 
-                    inv_path = generate_invoice(client_info, proj)
-                    files['Invoice'] = inv_path
+                    if not only_confirmation:
+                        inv_path = generate_invoice(client_info, proj)
+                        files['Invoice'] = inv_path
 
                     # Save project record
                     project_id = save_project(proj)
@@ -927,7 +935,7 @@ def page_cost():
             '状态': {'draft':'草稿','pending':'待审','approved':'通过','rejected':'驳回'}.get(p.get('status',''), p.get('status','')),
             '项目金额': f"{p.get('currency','USD')} {p.get('amount',0):,.0f}",
             '预估成本': f"{p.get('cost_currency','USD')} {p.get('estimated_cost',0):,.0f}",
-            '利润率': f"{((p.get('amount',0)-p.get('estimated_cost',0))/p.get('amount',1)*100):.0f}%" if p.get('amount',0) > 0 else '-',
+            '预计到账': str(p.get('expected_payment_date',''))[:10] if p.get('expected_payment_date') else '-',
             '成本构成': (p.get('cost_breakdown','') or '')[:80],
             '提交时间': (p.get('created_at','') or '')[:10],
             '提交人': p.get('created_by_name',''),
@@ -948,14 +956,110 @@ def page_cost():
     col1.metric("总项目数", len(all_projects))
     col2.metric("总收入 (全部)", f"${total_revenue:,.0f}")
     col3.metric("总成本 (全部)", f"${total_cost:,.0f}")
-    col4.metric("整体利润率", f"{(total_revenue-total_cost)/total_revenue*100:.0f}%" if total_revenue > 0 else "-")
+    col4.metric("预计到账项目", f"{sum(1 for p in all_projects if p.get('expected_payment_date'))}")
 
     if approved:
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("已通过项目", len(approved))
         col2.metric("已通过收入", f"${approved_rev:,.0f}")
         col3.metric("已通过成本", f"${approved_cost:,.0f}")
-        col4.metric("已通过利润率", f"{(approved_rev-approved_cost)/approved_rev*100:.0f}%" if approved_rev > 0 else "-")
+        col4.metric("已到账", f"{sum(1 for p in approved if p.get('payment_received'))}")
+
+
+# ============================================================
+# Project Proposal (立项审批)
+# ============================================================
+def page_proposal():
+    st.title("📋 项目立项")
+    user = st.session_state.user
+
+    tab_submit, tab_review = st.tabs(["提交立项", "审批立项"]) if user['role'] in ('admin',) else st.tabs(["提交立项"])
+
+    with tab_submit:
+        st.subheader("提交新项目立项")
+        clients = get_clients()
+        client_names = [c['short_name'] for c in clients]
+        sel = st.selectbox("客户简称", client_names, key="prop_client")
+        c = {c['short_name']: c for c in clients}.get(sel, {})
+
+        col1, col2 = st.columns(2)
+        with col1:
+            prop_name = st.text_input("项目名称 *", placeholder="如 XXX品牌7月UGC 150篇")
+            prop_amount = st.number_input("预估金额", min_value=0.0, step=100.0)
+            prop_currency = st.selectbox("币种", ["USD", "RMB"])
+        with col2:
+            prop_period = st.text_input("执行周期", placeholder="如 2026年8月")
+            prop_posts = st.text_input("内容数量", placeholder="如 150篇")
+            prop_platform = st.text_input("发布平台", value="小红书")
+
+        prop_note = st.text_area("备注", placeholder="项目简要说明...")
+
+        if st.button("📤 提交立项", type="primary", use_container_width=True):
+            if not prop_name or not sel:
+                st.error("请填写客户简称和项目名称")
+            else:
+                sb = get_connection()
+                sb.table("projects").insert({
+                    "project_code": f"PROP-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                    "project_name": prop_name,
+                    "client_id": c.get('id'),
+                    "brand_name": sel,
+                    "amount": prop_amount,
+                    "currency": prop_currency,
+                    "execution_period": prop_period,
+                    "total_posts": prop_posts,
+                    "platform": prop_platform,
+                    "content_type": prop_note,
+                    "status": "draft",
+                    "proposal_status": "pending",
+                    "created_by": user['id'],
+                }).execute()
+                st.success("✅ 立项申请已提交，等待审批！")
+                st.rerun()
+
+        # List my proposals
+        st.divider()
+        st.subheader("我的立项申请")
+        all_proj = get_projects(limit=200)
+        my_proposals = [p for p in all_proj if p.get('proposal_status') and p.get('created_by') == user['id']]
+        if my_proposals:
+            prop_map = {'pending': '⏳ 待审批', 'approved': '✅ 已通过', 'rejected': '❌ 已驳回'}
+            for p in my_proposals[:20]:
+                ps = prop_map.get(p.get('proposal_status'), p.get('proposal_status'))
+                st.write(f"{ps} **{p.get('project_name','')}** — {p.get('client_short','')} — {p.get('created_at','')[:10]}")
+        else:
+            st.info("暂无立项申请")
+
+    # Admin review tab
+    if user['role'] in ('admin',):
+        with tab_review:
+            st.subheader("待审批立项")
+            pending_props = [p for p in get_projects(limit=200) if p.get('proposal_status') == 'pending']
+            if not pending_props:
+                st.success("暂无待审批立项")
+            else:
+                for p in pending_props:
+                    with st.container(border=True):
+                        col1, col2 = st.columns([3, 1])
+                        with col1:
+                            st.write(f"**{p.get('project_name','')}**")
+                            st.caption(f"客户: {p.get('client_short','')} | "
+                                      f"金额: {p.get('currency','USD')} {p.get('amount',0):,.2f} | "
+                                      f"周期: {p.get('execution_period','')} | "
+                                      f"提交人: {p.get('created_by_name','')} | {p.get('created_at','')[:10]}")
+                            if p.get('content_type'):
+                                st.caption(f"备注: {p['content_type']}")
+                        with col2:
+                            if st.button("✅ 通过", key=f"app_p_{p['id']}", use_container_width=True):
+                                sb = get_connection()
+                                sb.table("projects").update({"proposal_status": "approved", "status": "draft"}).eq("id", p['id']).execute()
+                                st.success("已通过！可生成文档")
+                                st.rerun()
+                            if st.button("❌ 驳回", key=f"rej_p_{p['id']}", use_container_width=True):
+                                sb = get_connection()
+                                sb.table("projects").update({"proposal_status": "rejected"}).eq("id", p['id']).execute()
+                                st.warning("已驳回")
+                                st.rerun()
 
 
 # ============================================================
@@ -982,6 +1086,7 @@ else:
             "finance": page_finance,
             "receipt": page_receipt,
             "cost": page_cost,
+            "proposal": page_proposal,
             "admin": page_admin,
         }
         page_fn = pages.get(st.session_state.page, page_generate)

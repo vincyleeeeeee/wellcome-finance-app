@@ -117,9 +117,9 @@ def _overlay_stamp(pdf_path: str, output_path: str):
     ratio = stamp_w / stamp_img.width
     stamp_h = stamp_img.height * ratio
 
-    # At Name area: left side, lower portion
-    x = int(pw * 0.12) + random.randint(-10, 10)
-    y = int(ph * 0.12) + random.randint(-10, 10)
+    # At rows 15-16 area: right side, ~15-25% from bottom
+    x = int(pw * 0.55) + random.randint(-15, 15)
+    y = int(ph * 0.22) + random.randint(-10, 10)
     stamp_r = stamp_img.resize((int(stamp_w), int(stamp_h)), PILImage.LANCZOS)
 
     buf = io.BytesIO()
