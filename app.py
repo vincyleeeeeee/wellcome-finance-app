@@ -140,19 +140,21 @@ def page_login():
 
     with tab_login:
         st.subheader("登录")
-        email = st.text_input("邮箱", key="login_email", placeholder="your@email.com")
-        password = st.text_input("密码", type="password", key="login_password")
-        if st.button("登录", type="primary", use_container_width=True):
-            user = authenticate(email.strip(), password.strip())
-            if user is None:
-                st.error("邮箱或密码错误")
-            elif user['approved'] == 0:
-                st.warning("你的账号尚未通过审核，请等待管理员审批")
-            else:
-                _save_session(user['id'])
-                st.session_state.user = user
-                st.session_state.page = "generate"
-                st.rerun()
+        with st.form("login_form"):
+            email = st.text_input("邮箱", placeholder="your@email.com")
+            password = st.text_input("密码", type="password")
+            submitted = st.form_submit_button("登录", type="primary", use_container_width=True)
+            if submitted:
+                user = authenticate(email.strip(), password.strip())
+                if user is None:
+                    st.error("邮箱或密码错误")
+                elif user['approved'] == 0:
+                    st.warning("你的账号尚未通过审核，请等待管理员审批")
+                else:
+                    _save_session(user['id'])
+                    st.session_state.user = user
+                    st.session_state.page = "generate"
+                    st.rerun()
 
     with tab_register:
         st.subheader("注册")
