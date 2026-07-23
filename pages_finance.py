@@ -62,22 +62,13 @@ def page_overview():
 
     st.divider()
 
-    # === Full project table ===
-    rows = []
+    # === Project list as expandable cards ===
+    st.subheader("项目明细")
     for p in projects:
         stage = STAGE_MAP.get(p.get('status', ''), p.get('status', '?'))
-        closure = CLOSURE_MAP.get(p.get('closure_status', 'active'), '进行中')
-        paid = '✅' if p.get('payment_received') else ''
-
-        base = {
-            '阶段': stage,
-            '编号': p.get('project_code', ''),
-            '品牌': p.get('brand_name', ''),
-            '客户': p.get('client_short', ''),
-            '金额': f"{p.get('currency','USD')} {p.get('amount',0):,.0f}",
-            '结案': closure,
-            '到账': paid,
-        }
+        closure = CLOSURE_MAP.get(p.get('closure_status', 'active'), '')
+        paid = '💰已到账 ' if p.get('payment_received') else ''
+        feishu = ' 📋飞书' if p.get('feishu_approved') else ''
 
         # Parse cost breakdown
         try:
@@ -86,41 +77,25 @@ def page_overview():
         except Exception:
             cost_items = []
 
-        if cost_items:
-            for idx, item in enumerate(cost_items):
-                row = dict(base)
-                if idx > 0:
-                    # Only show project info on first row (visual merge)
-                    for k in ['阶段', '编号', '品牌', '客户', '金额', '结案', '到账']:
-                        row[k] = ''
-                row['成本细项'] = item.get('name', '')
-                row['成本金额'] = f"{item.get('currency','RMB')} {item.get('amount',0):,.0f}"
-                rows.append(row)
-        else:
-            row = dict(base)
-            row['成本细项'] = ''
-            row['成本金额'] = f"RMB {p.get('estimated_cost',0):,.0f}" if p.get('estimated_cost') else '-'
-            rows.append(row)
+        cost_summary = f" | 成本{len(cost_items)}项: RMB {p.get('estimated_cost',0):,.0f}" if p.get('estimated_cost') else ""
 
-    df = pd.DataFrame(rows)
-    st.dataframe(df, use_container_width=True, hide_index=True, height=600)
+        label = f"{stage} {paid}**{p.get('brand_name','')}** — {p.get('project_code','')} | {p.get('currency','USD')} {p.get('amount',0):,.0f}{cost_summary} {feishu} {closure}"
 
-    # === Quick actions at bottom ===
-    st.divider()
-    st.subheader("📥 发票与收据下载")
+        with st.expander(label, expanded=False):
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                st.caption(f"客户: {p.get('client_short','')} | 提交: {(p.get('created_at','') or '')[:10]}")
+                if cost_items:
+                    st.caption("**成本明细：**")
+                    for item in cost_items:
+                        st.write(f"• {item.get('name','')} — {item.get('currency','RMB')} {item.get('amount',0):,.0f}")
+                elif p.get('estimated_cost'):
+                    st.caption(f"成本: RMB {p.get('estimated_cost',0):,.0f}")
 
-    for p in projects:
-        if p.get('status') == 'approved':
-            col1, col2, col3 = st.columns([3, 1, 1])
-            with col1:
-                paid_mark = '💰已到账' if p.get('payment_received') else ''
-                st.write(f"**{p.get('brand_name','')}** — {p.get('project_code','')} — {p.get('created_at','')[:10]} {paid_mark}")
-            with col2:
-                if p.get('stamped_pdf_path'):
-                    # The stamp path might be on local disk. We regenerate for download.
+            with c2:
+                if p.get('status') == 'approved' and p.get('stamped_pdf_path'):
+                    # Download button will be added later
                     pass
-            with col3:
-                # Mark as paid button
                 if p.get('status') == 'approved' and not p.get('payment_received'):
                     if st.button("💰 标记到账", key=f"paid_{p['id']}", use_container_width=True):
                         from utils.database import get_connection
@@ -130,6 +105,7 @@ def page_overview():
                             "received_date": datetime.now().strftime('%Y-%m-%d'),
                         }).eq("id", p['id']).execute()
                         st.rerun()
+
 
 
 def page_approval():
