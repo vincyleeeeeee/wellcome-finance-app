@@ -7,33 +7,35 @@ from typing import Optional, Tuple, List, Dict, Any
 
 from supabase import create_client
 
+_supabase = None
+
 
 def _get_config():
-    """Get Supabase config from Streamlit secrets or env vars."""
-    # Try Streamlit secrets first
+    """Lazy-init: get Supabase config when first needed."""
+    # Try Streamlit secrets first (only works after st is loaded)
     try:
         import streamlit as st
-        url = st.secrets.get('SUPABASE_URL', '') if hasattr(st, 'secrets') else ''
-        key = st.secrets.get('SUPABASE_KEY', '') if hasattr(st, 'secrets') else ''
-        if not url:
-            url = st.secrets.get('SUPABASE_URL', '') if hasattr(st, 'secrets') else ''
-        if url and key:
-            return url, key
+        if hasattr(st, 'secrets'):
+            url = st.secrets.get('SUPABASE_URL', '') or ''
+            key = st.secrets.get('SUPABASE_KEY', '') or ''
+            if url and key:
+                return url, key
     except Exception:
         pass
     # Fall back to env vars
     return os.environ.get("SUPABASE_URL", ""), os.environ.get("SUPABASE_KEY", "")
 
 
-SUPABASE_URL, SUPABASE_KEY = _get_config()
-
-_supabase = None
-
-
 def _get_sb():
     global _supabase
     if _supabase is None:
-        _supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        url, key = _get_config()
+        if not url:
+            raise RuntimeError(
+                "Supabase 未配置。请在 Streamlit Cloud → Settings → Secrets 添加 "
+                "SUPABASE_URL 和 SUPABASE_KEY。"
+            )
+        _supabase = create_client(url, key)
     return _supabase
 
 
@@ -263,6 +265,22 @@ def reject_project(project_id: int, finance_user_id: int) -> bool:
     return True
 
 
+def get_pending_approvals() -> List[Dict]:
+    sb = _get_sb()
+    result = sb.table("projects").select("*, clients(short_name, full_name), creator:created_by(username)").eq("status", "pending").order("created_at", desc=True).execute()
+    data = result.data or []
+    for p in data:
+        if p.get("clients"):
+            p["client_short"] = p["clients"]["short_name"] if isinstance(p["clients"], dict) else ""
+            p["client_full"] = p["clients"]["full_name"] if isinstance(p["clients"], dict) else ""
+        if p.get("creator") and isinstance(p["creator"], dict):
+            p["created_by_name"] = p["creator"]["username"]
+    return data
+
+
+# ============================================================
+# Project code generation
+# ============================================================
 def generate_project_code(code_date: str) -> str:
     """
     Generate next project code: WELL + YYMMDD + XX (2-digit sequence).
@@ -278,19 +296,6 @@ def generate_project_code(code_date: str) -> str:
     return f"{prefix}{seq:02d}"
 
 
-def get_latest_code_for_month(year: int, month: int) -> str:
-    """
-    Get the latest project code for a given year/month.
-    Returns: e.g., 'WELL260703' (prefix only, no day/seq) or None
-    """
-    sb = _get_sb()
-    prefix = f"WELL{year % 100:02d}{month:02d}"
-    result = sb.table("projects").select("project_code").like("project_code", f"{prefix}%").order("project_code", desc=True).limit(1).execute()
-    if result.data:
-        return result.data[0]["project_code"]
-    return None
-
-
 def get_next_code_for_month(year: int, month: int) -> str:
     """
     Get the next available project code for a given month.
@@ -300,33 +305,11 @@ def get_next_code_for_month(year: int, month: int) -> str:
     sb = _get_sb()
     from datetime import datetime as dt
     prefix = f"WELL{year % 100:02d}{month:02d}"
-
-    # Count all projects for this month
-    result = sb.table("projects").select("id", count="exact").like("project_code", f"{prefix}%").execute()
-    count = (result.count or 0)
-
-    # Use the first day of month as the date part
     first_day = dt(year, month, 1)
     day_prefix = first_day.strftime('%y%m%d')
-
-    # Count how many already use this day prefix
     day_result = sb.table("projects").select("id", count="exact").like("project_code", f"WELL{day_prefix}%").execute()
     day_count = (day_result.count or 0)
-
     return f"WELL{day_prefix}{day_count + 1:02d}"
-
-
-def get_pending_approvals() -> List[Dict]:
-    sb = _get_sb()
-    result = sb.table("projects").select("*, clients(short_name, full_name), creator:created_by(username)").eq("status", "pending").order("created_at", desc=True).execute()
-    data = result.data or []
-    for p in data:
-        if p.get("clients"):
-            p["client_short"] = p["clients"]["short_name"] if isinstance(p["clients"], dict) else ""
-            p["client_full"] = p["clients"]["full_name"] if isinstance(p["clients"], dict) else ""
-        if p.get("creator") and isinstance(p["creator"], dict):
-            p["created_by_name"] = p["creator"]["username"]
-    return data
 
 
 # ============================================================
