@@ -372,12 +372,15 @@ def page_generate():
             if code_month < datetime.now().month:
                 code_year += 1  # if user selects earlier month, assume next year
         with col_show:
+        if edit_data and edit_data.get('project_code'):
+            project_code = st.text_input("项目编号 *", value=edit_data['project_code'])
+        else:
             try:
                 latest = get_next_code_for_month(code_year, code_month)
                 st.success(f"📝 **{code_month}月** 下一个可用编号：**{latest}**（实时，不会重复）")
             except Exception:
                 latest = f"WELL{code_year % 100:02d}{code_month:02d}01XX"
-        project_code = st.text_input("项目编号 *", value=latest, help="自动生成，可直接修改")
+            project_code = st.text_input("项目编号 *", value=latest, help="自动生成，可直接修改")
         project_name = st.text_input("项目名称 *", value=edit_data.get('project_name','') if edit_data else '',
                                      placeholder="品牌名 – 月份UGC 篇数")
         brand_name = st.text_input("客户品牌名 *", value=edit_data.get('brand_name','') if edit_data else '',
@@ -412,31 +415,53 @@ def page_generate():
         st.caption("成本构成（勾选后填入金额）")
         RATES = {"USD": 7.2, "RMB": 1.0, "THB": 0.2, "MYR": 1.55}
 
-        cost_items_data = []  # list of {name, amount, currency}
+        # Pre-fill cost items from edit data
+        edit_cost_map = {}
+        if edit_data and edit_data.get('cost_breakdown'):
+            try:
+                import json
+                for item in json.loads(edit_data['cost_breakdown']):
+                    edit_cost_map[item['name']] = item
+            except: pass
+
+        cost_items_data = []
         total_rmb = 0.0
 
         cost_cats = ["拍摄", "餐饮交通", "发布", "补发"]
         for cat in cost_cats:
-            use_cat = st.checkbox(cat, key=f"cost_{cat}")
+            pre = edit_cost_map.get(cat, {})
+            use_cat = st.checkbox(cat, value=(cat in edit_cost_map), key=f"cost_{cat}")
             if use_cat:
                 cc1, cc2 = st.columns([2, 1])
                 with cc1:
-                    amt = st.number_input(f"{cat}金额", min_value=0.0, step=100.0, value=None, key=f"amt_{cat}")
+                    amt = st.number_input(f"{cat}金额", min_value=0.0, step=100.0,
+                                          value=float(pre.get('amount', 0)) if pre.get('amount') else None, key=f"amt_{cat}")
                 with cc2:
-                    cur = st.selectbox("币种", ["RMB", "USD", "THB", "MYR"], key=f"cur_{cat}")
-                if amt > 0:
+                    cur_list = ["RMB", "USD", "THB", "MYR"]
+                    cur_idx = cur_list.index(pre.get('currency', 'RMB')) if pre.get('currency') in cur_list else 0
+                    cur = st.selectbox("币种", cur_list, index=cur_idx, key=f"cur_{cat}")
+                if amt and amt > 0:
                     total_rmb += amt * RATES.get(cur, 1)
                     cost_items_data.append({"name": cat, "amount": amt, "currency": cur})
 
         # Custom item
-        custom_name = st.text_input("其他项名称", placeholder="如：KOL费用", key="cost_custom_name")
+        custom_pre = {}
+        for k, v in edit_cost_map.items():
+            if k not in cost_cats:
+                custom_pre = v
+                break
+        custom_name = st.text_input("其他项名称", value=custom_pre.get('name', ''),
+                                    placeholder="如：KOL费用", key="cost_custom_name")
         if custom_name:
             cc1, cc2 = st.columns([2, 1])
             with cc1:
-                custom_amt = st.number_input(f"{custom_name}金额", min_value=0.0, step=100.0, value=None, key="amt_custom")
+                custom_amt = st.number_input(f"{custom_name}金额", min_value=0.0, step=100.0,
+                                             value=float(custom_pre.get('amount', 0)) if custom_pre.get('amount') else None, key="amt_custom")
             with cc2:
-                custom_cur = st.selectbox("币种", ["RMB", "USD", "THB", "MYR"], key="cur_custom")
-            if custom_amt > 0:
+                cur_list = ["RMB", "USD", "THB", "MYR"]
+                cur_idx = cur_list.index(custom_pre.get('currency', 'RMB')) if custom_pre.get('currency') in cur_list else 0
+                custom_cur = st.selectbox("币种", cur_list, index=cur_idx, key="cur_custom")
+            if custom_amt and custom_amt > 0:
                 total_rmb += custom_amt * RATES.get(custom_cur, 1)
                 cost_items_data.append({"name": custom_name, "amount": custom_amt, "currency": custom_cur})
 
