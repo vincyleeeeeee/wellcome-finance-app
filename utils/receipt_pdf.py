@@ -1,13 +1,8 @@
 """Cash receipt PDF — generates xlsx from template, converts via LibreOffice, stamps."""
 
-import os, io, shutil, subprocess, tempfile, random
+import os, io, shutil, subprocess, tempfile
 from datetime import datetime
 import openpyxl
-from PIL import Image as PILImage
-import pypdf
-from reportlab.pdfgen import canvas as rl_canvas
-from reportlab.lib.utils import ImageReader
-from reportlab.lib.pagesizes import A4
 
 ISSUER = {
     "name": "Mr. Terry.Su", "phone": "008613609023860",
@@ -61,7 +56,25 @@ def generate_receipt_pdf(client: dict, receipt_data: dict, output_path: str = No
     ds = d.strftime('%Y/%m/%d') if isinstance(d, datetime) else str(d)[:10]
     ws['D16'] = f"Name：\n\nDate：{ds}\n\nSignature：\n"
 
-    # Save filled xlsx
+    # Insert stamp image directly into the xlsx
+    stamp_file = None
+    for p in [
+        os.path.join(app_dir, "stamp", "stamp_final.png"),
+        "/Users/vincy/Documents/Wellcome/invoice-app/stamp/stamp_final.png",
+    ]:
+        if os.path.exists(p):
+            stamp_file = p
+            break
+
+    if stamp_file:
+        stamp_img = openpyxl.drawing.image.Image(stamp_file)
+        stamp_img.width = 180  # pixels in Excel
+        stamp_img.height = stamp_img.width * 471 / 1172  # maintain aspect ratio
+        # Place near rows 13-15, columns E-F (right side, above Name)
+        stamp_img.anchor = 'E13'
+        ws.add_image(stamp_img)
+
+    # Save filled xlsx with stamp embedded
     xlsx_buf = io.BytesIO()
     wb.save(xlsx_buf)
     xlsx_buf.seek(0)
@@ -70,7 +83,7 @@ def generate_receipt_pdf(client: dict, receipt_data: dict, output_path: str = No
         f.write(xlsx_buf.read())
         xlsx_path = f.name
 
-    # Convert to PDF via LibreOffice
+    # Convert to PDF via LibreOffice (stamp rendered natively, perfect quality)
     try:
         outdir = tempfile.mkdtemp()
         subprocess.run([_find_soffice(), "--headless", "--convert-to", "pdf",
@@ -79,8 +92,9 @@ def generate_receipt_pdf(client: dict, receipt_data: dict, output_path: str = No
         base = os.path.splitext(os.path.basename(xlsx_path))[0]
         pdf_tmp = os.path.join(outdir, base + ".pdf")
         if os.path.exists(pdf_tmp):
-            # Overlay stamp at Name area
-            _overlay_stamp(pdf_tmp, output_path)
+            # Copy to output
+            with open(pdf_tmp, 'rb') as src, open(output_path, 'wb') as dst:
+                dst.write(src.read())
         else:
             raise RuntimeError("LibreOffice conversion failed")
     finally:
@@ -96,44 +110,3 @@ def _dt(val):
     return str(val)[:10]
 
 
-def _overlay_stamp(pdf_path: str, output_path: str):
-    """Overlay stamp at Name/Signature area (left side)."""
-    for p in [
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), "stamp", "stamp_hq.png"),
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), "stamp", "stamp_final.png"),
-        "/Users/vincy/Documents/Wellcome/invoice-app/stamp/stamp_hq.png",
-        "/Users/vincy/Documents/Wellcome/invoice-app/stamp/stamp_final.png",
-    ]:
-        if os.path.exists(p):
-            stamp_file = p
-            break
-    else:
-        # No stamp, just copy
-        with open(pdf_path, 'rb') as src, open(output_path, 'wb') as dst:
-            dst.write(src.read())
-        return
-
-    stamp_img = PILImage.open(stamp_file).convert("RGBA")
-    pw, ph = float(A4[0]), float(A4[1])
-    stamp_w = pw * 0.20
-    ratio = stamp_w / stamp_img.width
-    stamp_h = stamp_img.height * ratio
-
-    # Above Name area: center-right, ~50% from top
-    x = int(pw * 0.50) + random.randint(-15, 15)
-    y = int(ph * 0.45) + random.randint(-10, 10)
-    stamp_r = stamp_img.resize((int(stamp_w), int(stamp_h)), PILImage.LANCZOS)
-
-    buf = io.BytesIO()
-    c = rl_canvas.Canvas(buf, pagesize=(pw, ph))
-    c.drawImage(ImageReader(stamp_r), x, y, stamp_w, stamp_h, mask='auto')
-    c.save(); buf.seek(0)
-
-    reader = pypdf.PdfReader(pdf_path)
-    writer = pypdf.PdfWriter()
-    overlay = pypdf.PdfReader(buf).pages[0]
-    for page in reader.pages:
-        page.merge_page(overlay, over=True)
-        writer.add_page(page)
-    with open(output_path, 'wb') as f:
-        writer.write(f)
