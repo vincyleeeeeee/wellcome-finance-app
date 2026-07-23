@@ -1,6 +1,7 @@
 """PDF generation: convert xlsx to PDF and overlay electronic stamp."""
 
 import os
+import shutil
 import subprocess
 import tempfile
 import random
@@ -11,13 +12,26 @@ STAMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "stamp")
 STAMP_PATH = os.path.join(STAMP_DIR, "stamp_final.png")
 
 
+def _find_soffice() -> str:
+    """Find LibreOffice soffice binary."""
+    for path in [
+        "/opt/homebrew/bin/soffice",
+        "soffice",
+        "/usr/bin/soffice",
+        "/usr/lib/libreoffice/program/soffice",
+    ]:
+        if shutil.which(path) or os.path.exists(path):
+            return path
+    return "soffice"
+
+
 def xlsx_to_pdf(xlsx_path: str, output_dir: str = None) -> str:
     """Convert xlsx to PDF using LibreOffice headless. Returns PDF path."""
     if output_dir is None:
         output_dir = tempfile.mkdtemp()
 
     cmd = [
-        "/opt/homebrew/bin/soffice",
+        _find_soffice(),
         "--headless",
         "--convert-to", "pdf",
         "--outdir", output_dir,
