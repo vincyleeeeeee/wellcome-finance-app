@@ -792,24 +792,30 @@ def _receipt_form(client, project):
 
     with col1:
         st.subheader("客户信息")
-        st.write(f"**{client.get('full_name', '')}**")
-        st.caption(f"联系人: {client.get('contact', '')}")
-        st.caption(f"地址: {client.get('address', '')}")
+        if client:
+            st.write(f"**{client.get('full_name', '')}**")
+            st.caption(f"联系人: {client.get('contact', '')}")
+            st.caption(f"地址: {client.get('address', '')}")
 
         if project:
             st.subheader("关联项目")
             st.write(f"**{project.get('brand_name', '')}** — {project.get('project_name', '')}")
             st.caption(f"编号: {project.get('project_code', '')}")
             st.caption(f"金额: {project.get('currency','USD')} {project.get('amount',0):,.2f}")
+            default_project_name = project.get('project_name', '')
+            default_project_code = project.get('project_code', '')
             default_amount = project['amount']
             default_currency = project.get('currency', 'USD')
             default_venue = project.get('venue', '')
             default_period = project.get('execution_period', '')
         else:
+            st.subheader("项目信息（手动填写）")
+            default_project_name = st.text_input("项目名称 *", placeholder="如 XXX品牌 7月UGC")
+            default_project_code = st.text_input("项目编号", placeholder="如 WELL26070101")
+            default_venue = st.text_input("地点", value="Bangkok")
+            default_period = st.text_input("项目日期范围", value="Jul 2026")
             default_amount = 0.0
             default_currency = 'USD'
-            default_venue = ''
-            default_period = ''
 
     with col2:
         st.subheader("收款信息")
@@ -831,10 +837,12 @@ def _receipt_form(client, project):
         with st.spinner("正在生成收据..."):
             receipt_data = {
                 'client_short': client.get('short_name', ''),
-                'brand_name': project.get('brand_name', 'N/A') if project else 'Manual',
-                'project_code': project.get('project_code', f"MANUAL-{datetime.now().strftime('%Y%m%d')}") if project else f"MANUAL-{datetime.now().strftime('%Y%m%d')}",
-                'project_name': project.get('project_name', '') if project else '',
-                'amount': project.get('amount', payment_amount) if project else payment_amount,
+                'brand_name': project.get('brand_name', 'N/A') if project else client.get('short_name', 'Manual'),
+                'project_code': default_project_code,
+                'project_name': default_project_name,
+                'amount': default_amount,
+                'project_date': default_period,
+                'venue': default_venue,
                 'currency': currency,
                 'payment_amount': payment_amount,
                 'payment_date': payment_date,

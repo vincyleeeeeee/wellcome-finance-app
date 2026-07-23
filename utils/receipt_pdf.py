@@ -1,19 +1,15 @@
-"""Generate cash receipt PDF directly using reportlab (no LibreOffice needed)."""
+"""Generate cash receipt PDF directly using reportlab (no LibreOffice/poppler needed)."""
 
 import os
-import tempfile
+import random
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm, cm
+from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
+from reportlab.lib.enums import TA_CENTER
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib import colors
-from reportlab.pdfgen import canvas
 from PIL import Image as PILImage
-import numpy as np
-
-PAGE_W, PAGE_H = A4  # 595.27 x 841.89 points
 
 # Fixed Wellcome issuer info
 ISSUER = {
@@ -26,161 +22,161 @@ ISSUER = {
 
 def generate_receipt_pdf(client: dict, receipt_data: dict, output_path: str = None) -> str:
     """
-    Generate a cash receipt PDF directly.
-
-    client: {'full_name': ..., 'address': ..., 'contact': ..., 'phone': ..., 'email': ...}
-    receipt_data: {
-        'project_name', 'project_code', 'amount', 'currency',
-        'payment_date', 'gained_date', 'payment_method',
-        'issuer_name', 'venue', 'project_date'
-    }
+    Generate a cash receipt PDF. No external dependencies needed.
     """
+    import tempfile
     if output_path is None:
         output_path = tempfile.mktemp(suffix=".pdf")
 
     doc = SimpleDocTemplate(output_path, pagesize=A4,
                            leftMargin=20*mm, rightMargin=20*mm,
                            topMargin=15*mm, bottomMargin=15*mm)
-
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('Title2', parent=styles['Title'], fontSize=16, spaceAfter=6*mm, alignment=TA_CENTER)
-    label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=8, textColor=colors.grey, leading=10)
-    value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=10, leading=13)
-    right_style = ParagraphStyle('Right', parent=styles['Normal'], fontSize=10, alignment=TA_RIGHT, leading=13)
+    title_style = ParagraphStyle('T', parent=styles['Title'], fontSize=16, spaceAfter=8*mm, alignment=TA_CENTER)
+    v = ParagraphStyle('V', parent=styles['Normal'], fontSize=10, leading=14)
+    vs = ParagraphStyle('VS', parent=styles['Normal'], fontSize=9, leading=12)
+    vl = ParagraphStyle('VL', parent=styles['Normal'], fontSize=8, textColor=colors.grey, leading=10)
 
     currency = receipt_data.get('currency', 'USD')
-    currency_symbol = '$' if currency == 'USD' else '¥'
     amount = receipt_data.get('payment_amount', receipt_data.get('amount', 0))
-
     elements = []
 
-    # === HEADER TABLE ===
+    # Title
+    elements.append(Paragraph("CASH RECEIPT / 收款收据", title_style))
+
+    # Header table: left=client info, right=issuer+payment info
+    c = client
+    rd = receipt_data
     header_data = [
-        # Row 1
         [
-            Paragraph("CASH RECEIPT / 收款收据", title_style),
-            "",
-        ],
-        # Spacer
-        ["", ""],
-        # Row 2 - Left info
-        [
-            Paragraph(f"<b>Project:</b> {receipt_data.get('project_name', '')}", value_style),
-            Paragraph(f"<b>Out by:</b> {receipt_data.get('issuer_name', ISSUER['name'])}", value_style),
+            _label_v("Project:", rd.get('project_name', ''), vl, v),
+            _label_v("Out by:", rd.get('issuer_name', ISSUER['name']), vl, v),
         ],
         [
-            Paragraph(f"<b>Project Date:</b> {receipt_data.get('project_date', '')}", value_style),
-            Paragraph(f"<b>Tel:</b> {ISSUER['phone']}", value_style),
+            _label_v("Project Date:", rd.get('project_date', ''), vl, v),
+            _label_v("Tel:", ISSUER['phone'], vl, v),
         ],
         [
-            Paragraph(f"<b>Venue:</b> {receipt_data.get('venue', '')}", value_style),
-            Paragraph(f"<b>Adr:</b> {ISSUER['address']}", value_style),
+            _label_v("Venue:", rd.get('venue', ''), vl, v),
+            _label_v("Adr:", ISSUER['address'], vl, v),
         ],
-        ["", ""],
-        # Client info
+        [Spacer(1, 4*mm), Spacer(1, 4*mm)],
         [
-            Paragraph(f"<b>From:</b> {client.get('full_name', '')}", value_style),
-            Paragraph(f"<b>Project Code:</b> {receipt_data.get('project_code', '')}", value_style),
+            _label_v("From:", c.get('full_name', ''), vl, v),
+            _label_v("Project Code:", rd.get('project_code', ''), vl, v),
         ],
         [
-            Paragraph(f"<b>Address:</b> {client.get('address', '')}", value_style),
+            _label_v("Address:", c.get('address', ''), vl, v),
             "",
         ],
         [
-            Paragraph(f"<b>Atten:</b> {client.get('contact', '')}", value_style),
-            Paragraph(f"<b>Payment Date:</b> {_fmt_date(receipt_data.get('payment_date'))}", value_style),
+            _label_v("Atten:", c.get('contact', ''), vl, v),
+            _label_v("Payment Date:", _fmt(rd.get('payment_date')), vl, v),
         ],
         [
-            Paragraph(f"<b>Tel:</b> {client.get('phone', '') or client.get('email', '')}", value_style),
-            Paragraph(f"<b>Gained Date:</b> {_fmt_date(receipt_data.get('gained_date'))}", value_style),
+            _label_v("Tel:", c.get('phone') or c.get('email', ''), vl, v),
+            _label_v("Gained Date:", _fmt(rd.get('gained_date')), vl, v),
         ],
         [
-            Paragraph(f"<b>Email:</b> {client.get('email', '')}", value_style) if client.get('email') and client['email'] != '（待补充）' else "",
-            Paragraph(f"<b>Payment Method:</b> {receipt_data.get('payment_method', 'BANK')}", value_style),
+            _label_v("Email:", c.get('email', ''), vl, v) if c.get('email') and c['email'] != '（待补充）' else "",
+            _label_v("Payment Method:", rd.get('payment_method', 'BANK'), vl, v),
         ],
     ]
+    t = Table(header_data, colWidths=[doc.width * 0.55, doc.width * 0.45])
+    t.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('TOPPADDING', (0, 0), (-1, -1), 3)]))
+    elements.append(t)
+    elements.append(Spacer(1, 10*mm))
 
-    header_table = Table(header_data, colWidths=[doc.width * 0.55, doc.width * 0.45])
-    header_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-        ('SPAN', (0, 0), (1, 0)),  # Title spans both columns
-    ]))
-    elements.append(header_table)
-    elements.append(Spacer(1, 8*mm))
-
-    # === BODY ===
-    body_text = (
+    # Body
+    body = (
         f"Received From <b>{ISSUER['company']}</b> "
         f"The amount of <b>{currency} {amount:,.2f}</b><br/>"
-        f"For the <b>{receipt_data.get('project_name', '')}</b> Project"
+        f"For the <b>{rd.get('project_name', '')}</b> Project"
     )
-    elements.append(Paragraph(body_text, value_style))
-    elements.append(Spacer(1, 15*mm))
+    elements.append(Paragraph(body, v))
+    elements.append(Spacer(1, 18*mm))
 
-    # === SIGNATURE ===
+    # Signature
     sig_data = [
-        [Paragraph(f"<b>Name:</b> ____________________", value_style), "", ""],
-        [Paragraph(f"<b>Date:</b> {_fmt_date(receipt_data.get('gained_date'))}", value_style), "", ""],
-        [Paragraph("<b>Signature:</b> ____________________", value_style), "", ""],
+        ["Name: ____________________", "", ""],
+        [f"Date: {_fmt(rd.get('gained_date'))}", "", ""],
+        ["Signature: ____________________", "", ""],
     ]
-    sig_table = Table(sig_data, colWidths=[doc.width * 0.33, doc.width * 0.33, doc.width * 0.33])
-    sig_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    elements.append(sig_table)
+    st = Table(sig_data, colWidths=[doc.width * 0.33]*3)
+    st.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('TOPPADDING', (0, 0), (-1, -1), 6)]))
+    elements.append(st)
 
-    # === STAMP OVERLAY ===
-    # Add stamp at bottom right after building
     doc.build(elements)
 
-    # Now overlay stamp
-    _overlay_stamp(output_path)
+    # Overlay stamp directly (no pdf2image/poppler)
+    _overlay_stamp_pure(output_path)
 
     return output_path
 
 
-def _fmt_date(val):
-    """Format date value for display."""
-    if val is None:
-        return ""
-    if isinstance(val, datetime):
-        return val.strftime('%Y/%m/%d')
+def _label_v(label, value, ls, vs):
+    return Paragraph(f"<font color='grey' size='8'>{label}</font> <font size='10'>{value}</font>", vs)
+
+
+def _fmt(val):
+    if val is None: return ""
+    if isinstance(val, datetime): return val.strftime('%Y/%m/%d')
     return str(val)[:10]
 
 
-def _overlay_stamp(pdf_path: str):
-    """Overlay blue stamp at bottom-right of the first page."""
-    stamp_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "stamp", "stamp_500.png")
-    if not os.path.exists(stamp_path):
-        stamp_path = "/Users/vincy/Documents/Wellcome/invoice-app/stamp/stamp_500.png"
-    if not os.path.exists(stamp_path):
-        return  # No stamp available
+def _overlay_stamp_pure(pdf_path: str):
+    """Overlay stamp using PyPDF2 (no poppler needed)."""
+    stamp_png = _find_stamp()
+    if not stamp_png:
+        return
 
-    from pdf2image import convert_from_path
-    from PIL import Image as PILImg
+    try:
+        import pypdf
+        from reportlab.pdfgen import canvas as rl_canvas
+        from reportlab.lib.utils import ImageReader
+        import io
 
-    images = convert_from_path(pdf_path, dpi=150)
-    stamp_img = PILImg.open(stamp_path).convert("RGBA")
-
-    stamped_images = []
-    import random
-    for page_img in images[:1]:  # First page only
-        pw, ph = page_img.size
-        stamp_w = int(pw * 0.18)
+        # Load and resize stamp
+        stamp_img = PILImage.open(stamp_png).convert("RGBA")
+        pw, ph = float(A4[0]), float(A4[1])
+        stamp_w = pw * 0.18
         ratio = stamp_w / stamp_img.width
-        stamp_h = int(stamp_img.height * ratio)
-        stamp_resized = stamp_img.resize((stamp_w, stamp_h), PILImg.LANCZOS)
+        stamp_h = stamp_img.height * ratio
 
-        margin_x = int(pw * 0.04) + random.randint(-15, 15)
-        margin_y = int(ph * 0.06) + random.randint(-10, 10)
-        x = pw - stamp_w - margin_x
-        y = ph - stamp_h - margin_y
+        # Position: bottom right with variation
+        mx = pw * 0.04 + random.randint(-15, 15)
+        my = ph * 0.06 + random.randint(-10, 10)
+        x = pw - stamp_w - mx
+        y = my
 
-        page_rgba = page_img.convert("RGBA")
-        page_rgba.paste(stamp_resized, (x, y), stamp_resized)
-        stamped_images.append(page_rgba.convert("RGB"))
+        # Create stamp overlay PDF
+        stamp_buf = io.BytesIO()
+        c = rl_canvas.Canvas(stamp_buf, pagesize=(pw, ph))
+        c.drawImage(ImageReader(stamp_img), x, y, stamp_w, stamp_h, mask='auto')
+        c.save()
+        stamp_buf.seek(0)
 
-    if stamped_images:
-        stamped_images[0].save(pdf_path, "PDF")
+        # Merge with original PDF
+        reader = pypdf.PdfReader(pdf_path)
+        writer = pypdf.PdfWriter()
+        stamp_page = pypdf.PdfReader(stamp_buf).pages[0]
+
+        for page in reader.pages:
+            page.merge_page(stamp_page, over=True)
+            writer.add_page(page)
+
+        with open(pdf_path, 'wb') as f:
+            writer.write(f)
+    except Exception:
+        pass  # Stamp is optional, skip if fails
+
+
+def _find_stamp():
+    for p in [
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "stamp", "stamp_500.png"),
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "stamp", "stamp_final.png"),
+        "/Users/vincy/Documents/Wellcome/invoice-app/stamp/stamp_500.png",
+    ]:
+        if os.path.exists(p):
+            return p
+    return None
