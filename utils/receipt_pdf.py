@@ -62,13 +62,13 @@ def generate_receipt_pdf(client: dict, receipt_data: dict, output_path: str = No
                  f"The amount of  {currency_label}{amount:,.2f}\n"
                  f"For the {rd.get('project_name', '')}  Project")
 
-    # Signature: write to top-left of merged range D15:D17
+    # Signature: D16:G16 is merged, write to D16 (top-left)
     d = rd.get('gained_date', datetime.now())
     if isinstance(d, datetime):
         ds = d.strftime('%Y/%m/%d')
     else:
         ds = str(d)[:10]
-    ws['D15'] = f"Name：\n\nDate：{ds}\n\nSignature：\n"
+    ws['D16'] = f"Name：\n\nDate：{ds}\n\nSignature：\n"
 
     # Save xlsx to bytes
     xlsx_buf = io.BytesIO()

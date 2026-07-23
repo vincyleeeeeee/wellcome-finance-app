@@ -290,7 +290,7 @@ def generate_cash_receipt(client: dict, receipt_data: dict) -> str:
         date_str = gained_date.strftime('%Y/%m/%d')
     else:
         date_str = str(gained_date)
-    ws['D15'] = f"Name：\n\nDate：{date_str}\n\nSignature：\n"
+    ws['D16'] = f"Name：\n\nDate：{date_str}\n\nSignature：\n"
 
     wb.save(output_path)
     return output_path
