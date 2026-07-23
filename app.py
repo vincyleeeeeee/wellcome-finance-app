@@ -350,7 +350,7 @@ def page_generate():
         project_name = st.text_input("项目名称 *", placeholder="品牌名 – 月份UGC 篇数")
         brand_name = st.text_input("客户品牌名 *", placeholder="品牌的社交媒体名")
         currency = st.selectbox("币种", ["USD", "RMB"], index=0)
-        amount = st.number_input("项目金额 *", min_value=0.0, step=100.0, value=4400.0)
+        amount = st.number_input("项目金额 *", min_value=0.0, step=100.0, value=0.0)
 
         venue = st.text_input("执行地点", value="Bangkok", placeholder="城市")
         execution_period = st.text_input("执行周期", placeholder="如 July – September 2026")
@@ -848,7 +848,7 @@ def _receipt_form(client, project):
         gained_date = st.date_input("到款日期", value=datetime.now())
         payment_method = st.selectbox("付款方式", ["BANK", "CASH", "TRANSFER"])
         payment_amount = st.number_input("实收金额", min_value=0.0,
-                                         value=float(default_amount), step=100.0)
+                                         value=float(default_amount) if default_amount > 0 else 0.0, step=100.0)
         currency = st.selectbox("币种", ["USD", "RMB"],
                                 index=0 if default_currency == "USD" else 1)
 
