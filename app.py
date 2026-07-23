@@ -397,7 +397,7 @@ def page_generate():
                 with cc1:
                     amt = st.number_input(f"{cat}金额", min_value=0.0, step=100.0, key=f"amt_{cat}")
                 with cc2:
-                    cur = st.selectbox("币种", ["USD", "RMB", "THB", "MYR"], key=f"cur_{cat}")
+                    cur = st.selectbox("币种", ["RMB", "USD", "THB", "MYR"], key=f"cur_{cat}")
                 if amt > 0:
                     total_rmb += amt * RATES.get(cur, 1)
                     cost_items_data.append({"name": cat, "amount": amt, "currency": cur})
@@ -409,7 +409,7 @@ def page_generate():
             with cc1:
                 custom_amt = st.number_input(f"{custom_name}金额", min_value=0.0, step=100.0, key="amt_custom")
             with cc2:
-                custom_cur = st.selectbox("币种", ["USD", "RMB", "THB", "MYR"], key="cur_custom")
+                custom_cur = st.selectbox("币种", ["RMB", "USD", "THB", "MYR"], key="cur_custom")
             if custom_amt > 0:
                 total_rmb += custom_amt * RATES.get(custom_cur, 1)
                 cost_items_data.append({"name": custom_name, "amount": custom_amt, "currency": custom_cur})
