@@ -3,274 +3,239 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import os
+import os, io, json, tempfile
 
 from utils.database import (
     get_projects, get_clients, get_client_by_id, get_pending_approvals,
-    approve_project, reject_project, set_user_role
+    approve_project, reject_project
 )
 from utils.receipt_pdf import generate_receipt_pdf
 from utils.generate import generate_cash_receipt
 
-
-def _export_overview_excel(projects):
-    """Export project overview as Excel file."""
-    import io, json, openpyxl
-    from openpyxl.styles import Font, Alignment
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "成本明细"
-
-    headers = ['项目编号', '品牌', '客户', '阶段', '金额', '成本细项', '成本金额', '币种', '到账', '结案']
-    for c, h in enumerate(headers, 1):
-        cell = ws.cell(1, c, h)
-        cell.font = Font(bold=True)
-        cell.alignment = Alignment(horizontal='center')
-
-    row = 2
-    for p in projects:
-        stage = {'draft':'草稿','pending':'待审核','approved':'已开发票','rejected':'已驳回'}.get(p.get('status',''),'')
-        closure = {'active':'进行中','pending_payment':'待收款','closed':'已结案'}.get(p.get('closure_status',''),'')
-        paid = '是' if p.get('payment_received') else '否'
-
-        try:
-            items = json.loads(p.get('cost_breakdown','') or '[]')
-        except:
-            items = []
-
-        if items:
-            for item in items:
-                ws.cell(row, 1, p.get('project_code',''))
-                ws.cell(row, 2, p.get('brand_name',''))
-                ws.cell(row, 3, p.get('client_short',''))
-                ws.cell(row, 4, stage)
-                ws.cell(row, 5, f"{p.get('currency','USD')} {p.get('amount',0):,.0f}")
-                ws.cell(row, 6, item.get('name',''))
-                ws.cell(row, 7, item.get('amount',0))
-                ws.cell(row, 8, item.get('currency','RMB'))
-                ws.cell(row, 9, paid)
-                ws.cell(row, 10, closure)
-                row += 1
-        else:
-            ws.cell(row, 1, p.get('project_code',''))
-            ws.cell(row, 2, p.get('brand_name',''))
-            ws.cell(row, 3, p.get('client_short',''))
-            ws.cell(row, 4, stage)
-            ws.cell(row, 5, f"{p.get('currency','USD')} {p.get('amount',0):,.0f}")
-            ws.cell(row, 6, '')
-            ws.cell(row, 7, p.get('estimated_cost',0))
-            ws.cell(row, 8, 'RMB')
-            ws.cell(row, 9, paid)
-            ws.cell(row, 10, closure)
-            row += 1
-
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-    st.download_button("📥 下载 Excel", buf, file_name="项目成本明细.xlsx",
-                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+STAGE_MAP = {'draft': '草稿', 'pending': '待审核', 'approved': '已开发票', 'rejected': '已驳回'}
+CLOSURE_MAP = {'active': '进行中', 'pending_payment': '待收款', 'closed': '已结案'}
 
 
 def _fmt_cost_line(cost_json: str) -> str:
-    """Format cost breakdown as a single sentence."""
-    if not cost_json:
-        return ""
+    if not cost_json: return ""
     try:
-        import json
         items = json.loads(cost_json)
         return "、".join(f"{i['name']}({i.get('currency','RMB')}{i.get('amount',0):,.0f})" for i in items)
-    except Exception:
-        return cost_json
-
-# Status mapping with clear labels
-STAGE_MAP = {
-    'draft': '📝 草稿',
-    'pending': '⏳ 待财务审核',
-    'approved': '✅ 已开发票',
-    'rejected': '❌ 已驳回',
-}
-
-CLOSURE_MAP = {
-    'active': '进行中',
-    'pending_payment': '待收款',
-    'closed': '🔒 已结案',
-}
+    except: return cost_json
 
 
 def page_overview():
-    """Big project overview — everything finance needs in one page."""
     st.title("📊 项目总览")
-
     projects = get_projects(limit=500)
-    if not projects:
-        st.info("暂无项目")
-        return
+    if not projects: st.info("暂无项目"); return
 
-    # === Summary cards at top ===
     pending_count = sum(1 for p in projects if p.get('status') == 'pending')
     approved_count = sum(1 for p in projects if p.get('status') == 'approved')
     received_count = sum(1 for p in projects if p.get('payment_received'))
     closed_count = sum(1 for p in projects if p.get('closure_status') == 'closed')
-
-    c1, c2, c3, c4 = st.columns(4)
+    c1,c2,c3,c4 = st.columns(4)
     c1.metric("⏳ 待审核", pending_count)
     c2.metric("✅ 已开发票", approved_count)
     c3.metric("💰 已到账", received_count)
     c4.metric("🔒 已结案", closed_count)
-
     st.divider()
 
-    # === Download button ===
-    col_dl, _ = st.columns([1, 3])
-    with col_dl:
-        if st.button("📥 下载成本明细表", use_container_width=True):
-            _export_overview_excel(projects)
+    # === Excel download ===
+    if st.button("📥 下载成本明细表", use_container_width=True):
+        _export_excel(projects)
 
-    # === Project list as expandable cards ===
+    # === Table with merged cells ===
     st.subheader("项目明细")
+    _render_table(projects)
+
+
+def _render_table(projects):
+    """Render HTML table with merged cells for same-project rows."""
+    rows_html = ""
     for p in projects:
         stage = STAGE_MAP.get(p.get('status', ''), p.get('status', '?'))
         closure = CLOSURE_MAP.get(p.get('closure_status', 'active'), '')
-        paid = '💰已到账 ' if p.get('payment_received') else ''
-        feishu = ' 📋飞书' if p.get('feishu_approved') else ''
+        paid = '✅' if p.get('payment_received') else ''
+        feishu = '✅' if p.get('feishu_approved') else ''
 
-        # Parse cost breakdown
-        try:
-            import json
-            cost_items = json.loads(p.get('cost_breakdown', '') or '[]')
-        except Exception:
-            cost_items = []
+        try: cost_items = json.loads(p.get('cost_breakdown','') or '[]')
+        except: cost_items = []
 
-        cost_summary = f" | 成本{len(cost_items)}项: RMB {p.get('estimated_cost',0):,.0f}" if p.get('estimated_cost') else ""
+        if cost_items:
+            n = len(cost_items)
+            for idx, item in enumerate(cost_items):
+                rows_html += "<tr>"
+                if idx == 0:
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{stage}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('project_code','')}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('brand_name','')}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('client_short','')}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
+                rows_html += f"<td>{item.get('name','')}</td>"
+                rows_html += f"<td style='text-align:right'>{item.get('currency','RMB')} {item.get('amount',0):,.0f}</td>"
+                rows_html += f"<td style='text-align:center'>{feishu}</td>"
+                if idx == 0:
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{paid}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{closure}</td>"
+                rows_html += "</tr>"
+        else:
+            rows_html += "<tr>"
+            rows_html += f"<td style='text-align:center'>{stage}</td>"
+            rows_html += f"<td style='text-align:center'>{p.get('project_code','')}</td>"
+            rows_html += f"<td style='text-align:center'>{p.get('brand_name','')}</td>"
+            rows_html += f"<td style='text-align:center'>{p.get('client_short','')}</td>"
+            rows_html += f"<td style='text-align:center'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
+            rows_html += f"<td></td><td style='text-align:right'>RMB {p.get('estimated_cost',0):,.0f}</td>"
+            rows_html += f"<td style='text-align:center'>{feishu}</td>"
+            rows_html += f"<td style='text-align:center'>{paid}</td>"
+            rows_html += f"<td style='text-align:center'>{closure}</td>"
+            rows_html += "</tr>"
 
-        label = f"{stage} {paid}**{p.get('brand_name','')}** — {p.get('project_code','')} | {p.get('currency','USD')} {p.get('amount',0):,.0f}{cost_summary} {feishu} {closure}"
+    html = f"""
+    <style>
+    table {{ border-collapse: collapse; width: 100%; font-size: 13px; }}
+    th, td {{ border: 1px solid #ddd; padding: 6px 8px; }}
+    th {{ background: #f5f5f5; text-align: center; }}
+    tr:nth-child(even) {{ background: #fafafa; }}
+    </style>
+    <table>
+    <tr><th>阶段</th><th>编号</th><th>品牌</th><th>客户</th><th>金额</th>
+    <th>成本细项</th><th>成本金额</th><th>飞书</th><th>到账</th><th>结案</th></tr>
+    {rows_html}
+    </table>
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
-        with st.expander(label, expanded=False):
-            c1, c2 = st.columns([3, 1])
-            with c1:
-                st.caption(f"客户: {p.get('client_short','')} | 提交: {(p.get('created_at','') or '')[:10]}")
-                if cost_items:
-                    st.caption("**成本明细：**")
-                    for item in cost_items:
-                        st.write(f"• {item.get('name','')} — {item.get('currency','RMB')} {item.get('amount',0):,.0f}")
-                elif p.get('estimated_cost'):
-                    st.caption(f"成本: RMB {p.get('estimated_cost',0):,.0f}")
-
-            with c2:
-                if p.get('status') == 'approved' and p.get('stamped_pdf_path'):
-                    # Download button will be added later
-                    pass
-                if p.get('status') == 'approved' and not p.get('payment_received'):
-                    if st.button("💰 标记到账", key=f"paid_{p['id']}", use_container_width=True):
-                        from utils.database import get_connection
-                        sb = get_connection()
-                        sb.table("projects").update({
-                            "payment_received": True,
-                            "received_date": datetime.now().strftime('%Y-%m-%d'),
-                        }).eq("id", p['id']).execute()
-                        st.rerun()
-
-
-
-def page_approval():
-    """Simple approval page — big buttons for finance."""
-    st.title("💰 待审核")
-    pending = get_pending_approvals()
-
-    if not pending:
-        st.success("✅ 没有需要审核的项目，太好了！")
-        return
-
-    st.subheader(f"共 {len(pending)} 个项目等你审核")
-    user = st.session_state.user
-
-    for p in pending:
-        with st.container(border=True):
-            # Big clear display
-            st.markdown(f"### {p.get('brand_name','')} — {p.get('project_name','')}")
-
-            feishu_ok = p.get('feishu_approved')
-            feishu_badge = "✅ 飞书已立项" if feishu_ok else "⚠️ 未确认飞书立项"
-
-            col_info, col_btn = st.columns([3, 2])
-            with col_info:
-                st.write(f"**{p.get('client_short','')}** | "
-                         f"{p.get('currency','USD')} **{p.get('amount',0):,.2f}** | "
-                         f"提交人: {p.get('created_by_name','?')} | "
-                         f"{feishu_badge}")
-                if p.get('estimated_cost'):
-                    cost_detail = _fmt_cost_line(p.get('cost_breakdown', '') or '')
-                    st.caption(f"预估成本: RMB {p.get('estimated_cost',0):,.0f}" + (f"（{cost_detail}）" if cost_detail else ""))
-                st.caption(f"提交时间: {p.get('created_at','')[:10]} | 预计到账: {str(p.get('expected_payment_date',''))[:10] if p.get('expected_payment_date') else '未填写'}")
-
-            with col_btn:
-                # Regenerate invoice for download
-                try:
-                    from utils.generate import TEMPLATE_DIR as _TD
-                    import openpyxl, io
-                    client = get_client_by_id(p.get('client_id')) or {}
-                    if client:
-                        wb = openpyxl.load_workbook(os.path.join(_TD, "Invoice-Template.xlsx"))
-                        ws = wb.active
-                        ws['C3'] = f"{p.get('brand_name','')} – {p.get('total_posts','')} CONTENT PACKAGE"
-                        ws['C7'] = client.get('full_name','')
-                        ws['C9'] = client.get('contact','')
-                        ws['E8'] = p.get('project_code','')
-                        ws['D15'] = p.get('amount',0); ws['E15'] = 1; ws['G15'] = p.get('amount',0)
-                        ws['E11'] = p.get('project_code','')
-                        ws['E10'] = str(p.get('due_date',''))[:10]
-                        buf = io.BytesIO(); wb.save(buf); buf.seek(0)
-                        st.download_button("📥 下载Invoice核对", buf, file_name=f"{p.get('project_code','')}.xlsx",
-                                          key=f"invdl_{p['id']}", use_container_width=True,
-                                          mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                except: pass
-
-                st.write("")  # spacer
-                if st.button("✅ 通过", key=f"ok_{p['id']}", use_container_width=True, type="primary"):
-                    with st.spinner("生成盖章PDF..."):
-                        try:
-                            regen_invoice_and_stamp(p, user['id'])
-                            st.success("已通过！")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"失败: {e}")
-
-                if st.button("❌ 驳回", key=f"no_{p['id']}", use_container_width=True):
-                    reject_project(p['id'], user['id'])
-                    st.warning("已驳回")
+    # Quick actions
+    for p in projects:
+        if p.get('status') == 'approved' and not p.get('payment_received'):
+            col_a, col_b = st.columns([4, 1])
+            with col_b:
+                if st.button(f"💰 标记到账", key=f"paid_{p['id']}"):
+                    from utils.database import get_connection
+                    get_connection().table("projects").update({
+                        "payment_received": True,
+                        "received_date": datetime.now().strftime('%Y-%m-%d'),
+                    }).eq("id", p['id']).execute()
                     st.rerun()
 
 
-def regen_invoice_and_stamp(p, user_id):
-    """Regenerate invoice + stamped PDF, approve project."""
-    import io, tempfile, openpyxl, os as _os
-    from utils.pdf_utils import generate_stamped_pdf
-    from utils.generate import TEMPLATE_DIR as _TD
+def _export_excel(projects):
+    import openpyxl as xl
+    from openpyxl.styles import Font, Alignment
+    wb = xl.Workbook(); ws = wb.active; ws.title = "成本明细"
+    hs = ['项目编号','品牌','客户','阶段','金额','成本细项','成本金额','币种','到账','结案']
+    for c,h in enumerate(hs,1):
+        cell=ws.cell(1,c,h); cell.font=Font(bold=True); cell.alignment=Alignment(horizontal='center')
+    row=2
+    for p in projects:
+        stage=STAGE_MAP.get(p.get('status',''),'')
+        closure=CLOSURE_MAP.get(p.get('closure_status',''),'')
+        paid='是' if p.get('payment_received') else '否'
+        try: items=json.loads(p.get('cost_breakdown','') or '[]')
+        except: items=[]
+        if items:
+            for it in items:
+                ws.cell(row,1,p.get('project_code','')); ws.cell(row,2,p.get('brand_name',''))
+                ws.cell(row,3,p.get('client_short','')); ws.cell(row,4,stage)
+                ws.cell(row,5,f"{p.get('currency','USD')} {p.get('amount',0):,.0f}")
+                ws.cell(row,6,it.get('name','')); ws.cell(row,7,it.get('amount',0))
+                ws.cell(row,8,it.get('currency','RMB')); ws.cell(row,9,paid); ws.cell(row,10,closure)
+                row+=1
+        else:
+            ws.cell(row,1,p.get('project_code','')); ws.cell(row,2,p.get('brand_name',''))
+            ws.cell(row,3,p.get('client_short','')); ws.cell(row,4,stage)
+            ws.cell(row,5,f"{p.get('currency','USD')} {p.get('amount',0):,.0f}")
+            ws.cell(row,7,p.get('estimated_cost',0)); ws.cell(row,8,'RMB')
+            ws.cell(row,9,paid); ws.cell(row,10,closure)
+            row+=1
+    buf=io.BytesIO(); wb.save(buf); buf.seek(0)
+    st.download_button("📥 下载 Excel", buf, file_name="项目成本明细.xlsx",
+                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-    client = get_client_by_id(p.get('client_id')) or {}
-    # Build xlsx
-    wb = openpyxl.load_workbook(_os.path.join(_TD, "Invoice-Template.xlsx"))
-    ws = wb.active
-    ws['C3'] = f"{p.get('brand_name','')} – {p.get('total_posts','')} CONTENT PACKAGE"
-    ws['C7'] = client.get('full_name','')
-    ws['C8'] = client.get('address','')
-    ws['C9'] = client.get('contact','')
-    ws['C10'] = client.get('phone') if client.get('phone') and client['phone'] != '（待补充）' else None
-    ws['C11'] = client.get('email') if client.get('email') and client['email'] != '（待补充）' else None
-    ws['E8'] = p.get('project_code','')
-    ws['E10'] = str(p.get('due_date',''))[:10]
-    ws['E11'] = p.get('project_code','')
-    ws['D15'] = p.get('amount',0); ws['E15'] = 1; ws['G15'] = p.get('amount',0)
+
+def page_approval():
+    """Simple approval page."""
+    st.title("⏳ 待审核")
+    pending = get_pending_approvals()
+    if not pending: st.success("✅ 没有需要审核的项目"); return
+    st.subheader(f"共 {len(pending)} 个项目等你审核")
+    user=st.session_state.user
+
+    for p in pending:
+        with st.container(border=True):
+            st.markdown(f"### {p.get('brand_name','')} — {p.get('project_name','')}")
+            feishu_badge = "✅ 飞书已立项" if p.get('feishu_approved') else "⚠️ 未确认飞书立项"
+            col_info,col_btn=st.columns([3,2])
+            with col_info:
+                st.write(f"**{p.get('client_short','')}** | {p.get('currency','USD')} **{p.get('amount',0):,.2f}** | {feishu_badge}")
+                if p.get('estimated_cost'):
+                    cd=_fmt_cost_line(p.get('cost_breakdown','') or '')
+                    st.caption(f"预估成本: RMB {p.get('estimated_cost',0):,.0f}"+(f"（{cd}）" if cd else ""))
+                st.caption(f"提交: {(p.get('created_at','') or '')[:10]}")
+
+            with col_btn:
+                _gen_invoice_dl(p)
+                if st.button("✅ 通过", key=f"ok_{p['id']}", use_container_width=True, type="primary"):
+                    with st.spinner("生成盖章PDF..."):
+                        try:
+                            _regen_and_approve(p, user['id'])
+                            st.success("已通过！"); st.rerun()
+                        except Exception as e: st.error(f"失败: {e}")
+                if st.button("❌ 驳回", key=f"no_{p['id']}", use_container_width=True):
+                    reject_project(p['id'], user['id']); st.warning("已驳回"); st.rerun()
+
+
+def _gen_invoice_dl(p):
+    """Generate invoice download button for approval preview."""
+    try:
+        import openpyxl as xl
+        from utils.generate import TEMPLATE_DIR as TD
+        client=get_client_by_id(p.get('client_id')) or {}
+        if not client: return
+        wb=xl.load_workbook(os.path.join(TD,"Invoice-Template.xlsx")); ws=wb.active
+        ws['C3']=f"{p.get('brand_name','')} – {p.get('total_posts','')} CONTENT PACKAGE"
+        ws['C7']=client.get('full_name',''); ws['C9']=client.get('contact','')
+        ws['E8']=p.get('project_code',''); ws['E11']=p.get('project_code','')
+        ws['D15']=p.get('amount',0); ws['E15']=1; ws['G15']=p.get('amount',0)
+        ws['E10']=str(p.get('due_date',''))[:10]
+        _write_c18(ws, p.get('amount',0), p.get('currency','USD'))
+        buf=io.BytesIO(); wb.save(buf); buf.seek(0)
+        st.download_button("📥 下载Invoice", buf, file_name=f"{p.get('brand_name','')}-invoice.xlsx",
+                          key=f"invdl_{p['id']}", use_container_width=True,
+                          mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    except: pass
+
+
+def _write_c18(ws, amount, currency):
+    """Write C18 with Chinese uppercase + English amount."""
     from utils.generate import _amount_chinese
-    cn_amt = _amount_chinese(p.get('amount',0), p.get('currency','USD'))
-    ws['C18'] = f"總付款金額為{cn_amt}\nFull payment of {p.get('currency','USD')} {p.get('amount',0):,.2f}"
+    cl = "RMB" if currency=="RMB" else "USD"
+    cn = _amount_chinese(amount, currency)
+    ws['C18'] = f"總付款金額為{cn}\nFull payment of {cl} {amount:,.2f}"
 
-    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
 
-    with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f:
-        f.write(buf.read()); xlsx_path = f.name
-
-    stamped_path = tempfile.mktemp(suffix='.pdf')
+def _regen_and_approve(p, user_id):
+    """Regenerate stamped invoice PDF and approve."""
+    import openpyxl as xl
+    from utils.pdf_utils import generate_stamped_pdf
+    from utils.generate import TEMPLATE_DIR as TD
+    client=get_client_by_id(p.get('client_id')) or {}
+    wb=xl.load_workbook(os.path.join(TD,"Invoice-Template.xlsx")); ws=wb.active
+    ws['C3']=f"{p.get('brand_name','')} – {p.get('total_posts','')} CONTENT PACKAGE"
+    ws['C7']=client.get('full_name',''); ws['C8']=client.get('address','')
+    ws['C9']=client.get('contact','')
+    ws['C10']=client.get('phone') if client.get('phone') and client['phone']!='（待补充）' else None
+    ws['C11']=client.get('email') if client.get('email') and client['email']!='（待补充）' else None
+    ws['E8']=p.get('project_code',''); ws['E10']=str(p.get('due_date',''))[:10]
+    ws['E11']=p.get('project_code',''); ws['D15']=p.get('amount',0)
+    ws['E15']=1; ws['G15']=p.get('amount',0)
+    _write_c18(ws, p.get('amount',0), p.get('currency','USD'))
+    buf=io.BytesIO(); wb.save(buf); buf.seek(0)
+    xlsx_path=tempfile.mktemp(suffix='.xlsx')
+    with open(xlsx_path,'wb') as f: f.write(buf.read())
+    stamped_path=tempfile.mktemp(suffix='.pdf')
     generate_stamped_pdf(xlsx_path, stamped_path)
     approve_project(p['id'], user_id, stamped_path)
-    _os.unlink(xlsx_path)
+    try: os.unlink(xlsx_path)
+    except: pass
