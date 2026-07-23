@@ -221,7 +221,9 @@ def regen_invoice_and_stamp(p, user_id):
     ws['E10'] = str(p.get('due_date',''))[:10]
     ws['E11'] = p.get('project_code','')
     ws['D15'] = p.get('amount',0); ws['E15'] = 1; ws['G15'] = p.get('amount',0)
-    ws['C18'] = f"Full payment of {p.get('currency','USD')} {p.get('amount',0):,.2f}"
+    from utils.generate import _amount_chinese
+    cn_amt = _amount_chinese(p.get('amount',0), p.get('currency','USD'))
+    ws['C18'] = f"總付款金額為{cn_amt}\nFull payment of {p.get('currency','USD')} {p.get('amount',0):,.2f}"
 
     buf = io.BytesIO(); wb.save(buf); buf.seek(0)
 

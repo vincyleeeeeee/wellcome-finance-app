@@ -87,7 +87,7 @@ def generate_confirmation_letter(client: dict, project: dict) -> str:
     output_dir = os.path.join(OUTPUT_BASE, project['client_short'], project['brand_name'], "财务")
     os.makedirs(output_dir, exist_ok=True)
 
-    filename = f"{project['brand_name']}-{project['total_posts'].replace(' ', '-')}-Confirmation-Letter.docx"
+    filename = f"{project['brand_name']}-confirmation-letter.docx"
     output_path = os.path.join(output_dir, filename)
 
     doc = Document(os.path.join(TEMPLATE_DIR, "Confirmation-Letter-Template.docx"))
@@ -139,7 +139,7 @@ def generate_invoice(client: dict, project: dict) -> str:
     output_dir = os.path.join(OUTPUT_BASE, project['client_short'], project['brand_name'], "财务")
     os.makedirs(output_dir, exist_ok=True)
 
-    filename = f"{project['brand_name']}-{project['total_posts'].replace(' ', '-')}-invoice.xlsx"
+    filename = f"{project['brand_name']}-invoice.xlsx"
     output_path = os.path.join(output_dir, filename)
 
     wb = openpyxl.load_workbook(os.path.join(TEMPLATE_DIR, "Invoice-Template.xlsx"))
@@ -248,7 +248,7 @@ def generate_cash_receipt(client: dict, receipt_data: dict) -> str:
                               receipt_data.get('brand_name', ''), "财务")
     os.makedirs(output_dir, exist_ok=True)
 
-    filename = f"{receipt_data['brand_name']}-Receipt-{receipt_data['project_code']}.xlsx"
+    filename = f"{receipt_data['brand_name']}-cash-receipt.xlsx"
     output_path = os.path.join(output_dir, filename)
 
     wb = openpyxl.load_workbook(os.path.join(TEMPLATE_DIR, "Cash-Receipt-Template.xlsx"))
