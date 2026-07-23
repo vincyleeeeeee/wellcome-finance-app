@@ -14,7 +14,7 @@ from utils.database import (
     upsert_client, delete_client,
     save_project, get_projects, get_project_by_id,
     submit_for_approval, approve_project, reject_project, get_pending_approvals,
-    set_user_role, generate_project_code
+    set_user_role, generate_project_code, get_next_code_for_month
 )
 from utils.generate import (
     generate_confirmation_letter, generate_invoice,
@@ -111,6 +111,9 @@ def render_sidebar():
             if st.button("🧾 开具收据", use_container_width=True,
                          type="primary" if st.session_state.page == "receipt" else "secondary"):
                 st.session_state.page = "receipt"
+            if st.button("📊 成本总览", use_container_width=True,
+                         type="primary" if st.session_state.page == "cost" else "secondary"):
+                st.session_state.page = "cost"
 
         if user['role'] == 'admin':
             pending = len(get_pending_users())
@@ -137,7 +140,7 @@ def page_login():
         email = st.text_input("邮箱", key="login_email", placeholder="your@email.com")
         password = st.text_input("密码", type="password", key="login_password")
         if st.button("登录", type="primary", use_container_width=True):
-            user = authenticate(email, password)
+            user = authenticate(email.strip(), password.strip())
             if user is None:
                 st.error("邮箱或密码错误")
             elif user['approved'] == 0:
@@ -164,7 +167,7 @@ def page_login():
             elif len(new_password) < 6:
                 st.error("密码至少6位")
             else:
-                success, msg = create_user(new_email, new_username, new_password)
+                success, msg = create_user(new_email.strip(), new_username.strip(), new_password.strip())
                 if success:
                     st.success(msg)
                 else:
@@ -322,15 +325,23 @@ def page_generate():
         st.caption(f"📋 {client_info['full_name']}  |  联系人: {client_info['contact']}  |  {phone_email}")
 
         application_date = st.date_input("申请日期 *", value=datetime.now())
-        code_date = st.date_input("编号日期（用于生成项目编号）", value=datetime.now(),
-                                  help="格式：WELL+YYMMDD+序号。如下月项目请改日期。")
-        # Preview and editable project code
-        date_str_val = code_date.strftime('%y%m%d')
-        preview_code = f"WELL{date_str_val}XX"
-        project_code = st.text_input("项目编号 *", value=preview_code, placeholder="WELL20260701001",
-                                     help=f"默认自动生成，可直接修改。确认后序号为当月实际序号。")
-        # Show hint
-        st.caption(f"💡 输入框默认值可修改。提交时会自动将 XX 替换为当月实际序号。")
+        # Month selector for project code
+        col_month, col_show = st.columns([1, 2])
+        with col_month:
+            code_month = st.selectbox("编号月份", list(range(1, 13)),
+                                      index=datetime.now().month - 1,
+                                      format_func=lambda m: f"{m}月",
+                                      help="选月份查看该月最新编号")
+            code_year = datetime.now().year
+            if code_month < datetime.now().month:
+                code_year += 1  # if user selects earlier month, assume next year
+        with col_show:
+            try:
+                latest = get_next_code_for_month(code_year, code_month)
+                st.success(f"📝 **{code_month}月** 下一个可用编号：**{latest}**（实时，不会重复）")
+            except Exception:
+                latest = f"WELL{code_year % 100:02d}{code_month:02d}01XX"
+        project_code = st.text_input("项目编号 *", value=latest, help="自动生成，可直接修改")
         project_name = st.text_input("项目名称 *", placeholder="品牌名 – 月份UGC 篇数")
         brand_name = st.text_input("客户品牌名 *", placeholder="品牌的社交媒体名")
         currency = st.selectbox("币种", ["USD", "RMB"], index=0)
@@ -360,10 +371,6 @@ def page_generate():
             if not all([project_code, project_name, brand_name, amount > 0]):
                 st.error("请填写所有带 * 的必填项")
             else:
-                # Auto-generate if user left default (contains XX), else use as-is
-                if "XX" in project_code or "xx" in project_code:
-                    project_code = generate_project_code(code_date.strftime("%Y-%m-%d"))
-                # else: use user's manually entered code
                 # Build project dict for generation
                 proj = {
                     'client_short': selected_client,
@@ -452,35 +459,90 @@ def page_generate():
 # ============================================================
 def page_history():
     st.title("📋 项目历史")
-    projects = get_projects(limit=100)
+    user = st.session_state.user
+
+    # Filter: show my projects or all
+    show_all = st.checkbox("显示所有项目", value=(user['role'] in ('admin', 'finance')))
+    projects = get_projects(limit=200)
+    if not show_all:
+        projects = [p for p in projects if p.get('created_by') == user['id']]
 
     if not projects:
         st.info("暂无项目记录")
         return
 
-    import pandas as pd
     status_map = {'draft': '草稿', 'pending': '待审核', 'approved': '✅ 已通过', 'rejected': '❌ 已驳回'}
+    closure_map = {'active': '🟢 进行中', 'pending_payment': '🟡 待付款', 'closed': '🔵 已结案'}
+
     for p in projects:
         status_label = status_map.get(p.get('status'), p.get('status', '?'))
+        closure = p.get('closure_status', 'active') or 'active'
+        closure_label = closure_map.get(closure, closure)
+
         with st.container(border=True):
+            # Row 1: basic info
             col1, col2 = st.columns([3, 1])
             with col1:
-                st.write(f"{status_label} **{p.get('brand_name','?')}** — {p.get('project_code','?')}")
-                st.caption(f"客户: {p.get('client_short','?')} | "
-                          f"金额: {p.get('currency','USD')} {p.get('amount',0):,.2f} | "
-                          f"日期: {p.get('created_at','')[:10]}")
+                st.write(f"{status_label} {closure_label} **{p.get('brand_name','?')}** — {p.get('project_code','?')}")
+                info_parts = [f"金额: {p.get('currency','USD')} {p.get('amount',0):,.2f}"]
+                if p.get('estimated_cost'):
+                    info_parts.append(f"成本: {p.get('cost_currency','USD')} {p.get('estimated_cost',0):,.0f}")
+                info_parts.append(f"提交: {p.get('created_at','')[:10]}")
+                if p.get('expected_payment_date'):
+                    info_parts.append(f"预计付款: {p['expected_payment_date']}")
+                st.caption(" | ".join(info_parts))
+
             with col2:
-                # Download buttons for approved projects
                 if p.get('status') == 'approved' and p.get('stamped_pdf_path'):
                     stamped = p['stamped_pdf_path']
                     if os.path.exists(stamped):
                         with open(stamped, "rb") as f:
-                            st.download_button(
-                                "📥 盖章PDF", f, file_name=os.path.basename(stamped),
-                                key=f"hist_stamped_{p['id']}", use_container_width=True
-                            )
-                elif p.get('status') == 'pending':
-                    st.caption("⏳ 等待审核")
+                            st.download_button("📥 盖章PDF", f, file_name=os.path.basename(stamped),
+                                             key=f"hist_stamped_{p['id']}", use_container_width=True)
+
+            # Row 2: editable fields (visible to project owner or finance/admin)
+            if user['id'] == p.get('created_by') or user['role'] in ('finance', 'admin'):
+                with st.expander("✏️ 编辑项目状态", expanded=False):
+                    ce1, ce2, ce3 = st.columns(3)
+                    with ce1:
+                        new_closure = st.selectbox(
+                            "结案状态", ['active', 'pending_payment', 'closed'],
+                            index=['active', 'pending_payment', 'closed'].index(closure),
+                            format_func=lambda x: closure_map.get(x, x),
+                            key=f"closure_{p['id']}"
+                        )
+                    with ce2:
+                        curr_ed = p.get('expected_payment_date')
+                        new_ed = st.date_input("预计客户付款时间",
+                                              value=datetime.strptime(curr_ed, '%Y-%m-%d') if curr_ed else None,
+                                              key=f"expay_{p['id']}")
+                    with ce3:
+                        if st.button("💾 保存", key=f"save_hist_{p['id']}", use_container_width=True):
+                            sb = get_connection()
+                            updates = {"closure_status": new_closure}
+                            if new_ed:
+                                updates["expected_payment_date"] = new_ed.strftime('%Y-%m-%d')
+                            if new_closure == 'closed':
+                                updates["actual_payment_date"] = datetime.now().strftime('%Y-%m-%d')
+                            sb.table("projects").update(updates).eq("id", p['id']).execute()
+                            st.success("已更新！")
+                            st.rerun()
+
+                    # Finance: send reminder
+                    if user['role'] in ('finance', 'admin') and not p.get('reminder_sent'):
+                        with ce3:
+                            if st.button("🔔 提醒负责人", key=f"remind_{p['id']}", use_container_width=True):
+                                note = f"财务提醒：项目 {p['project_code']} 请更新客户付款时间及结案状态"
+                                sb = get_connection()
+                                sb.table("projects").update({
+                                    "reminder_sent": True,
+                                    "reminder_note": note,
+                                    "reminder_sent_at": datetime.now().isoformat()
+                                }).eq("id", p['id']).execute()
+                                st.success("已提醒！")
+                                st.rerun()
+                    elif p.get('reminder_sent'):
+                        st.info(f"🔔 已提醒 | {p.get('reminder_note','')[:80]}")
 
 
 # ============================================================
@@ -763,6 +825,62 @@ def _receipt_form(client, project):
 
 
 # ============================================================
+# Cost Overview Page (finance/admin)
+# ============================================================
+def page_cost():
+    st.title("📊 成本总览")
+    user = st.session_state.user
+    if user['role'] not in ('finance', 'admin'):
+        st.error("无权访问")
+        return
+
+    all_projects = get_projects(limit=500)
+    if not all_projects:
+        st.info("暂无项目")
+        return
+
+    import pandas as pd
+    rows = []
+    for p in all_projects:
+        rows.append({
+            '项目编号': p.get('project_code',''),
+            '品牌': p.get('brand_name',''),
+            '客户': p.get('client_short',''),
+            '状态': {'draft':'草稿','pending':'待审','approved':'通过','rejected':'驳回'}.get(p.get('status',''), p.get('status','')),
+            '项目金额': f"{p.get('currency','USD')} {p.get('amount',0):,.0f}",
+            '预估成本': f"{p.get('cost_currency','USD')} {p.get('estimated_cost',0):,.0f}",
+            '利润率': f"{((p.get('amount',0)-p.get('estimated_cost',0))/p.get('amount',1)*100):.0f}%" if p.get('amount',0) > 0 else '-',
+            '成本构成': (p.get('cost_breakdown','') or '')[:80],
+            '提交时间': (p.get('created_at','') or '')[:10],
+            '提交人': p.get('created_by_name',''),
+            '已到账': '✅' if p.get('payment_received') else '⏳',
+        })
+
+    df = pd.DataFrame(rows)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    # Summary
+    total_revenue = sum(p.get('amount',0) or 0 for p in all_projects)
+    total_cost = sum(p.get('estimated_cost',0) or 0 for p in all_projects)
+    approved = [p for p in all_projects if p.get('status')=='approved']
+    approved_rev = sum(p.get('amount',0) or 0 for p in approved)
+    approved_cost = sum(p.get('estimated_cost',0) or 0 for p in approved)
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("总项目数", len(all_projects))
+    col2.metric("总收入 (全部)", f"${total_revenue:,.0f}")
+    col3.metric("总成本 (全部)", f"${total_cost:,.0f}")
+    col4.metric("整体利润率", f"{(total_revenue-total_cost)/total_revenue*100:.0f}%" if total_revenue > 0 else "-")
+
+    if approved:
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("已通过项目", len(approved))
+        col2.metric("已通过收入", f"${approved_rev:,.0f}")
+        col3.metric("已通过成本", f"${approved_cost:,.0f}")
+        col4.metric("已通过利润率", f"{(approved_rev-approved_cost)/approved_rev*100:.0f}%" if approved_rev > 0 else "-")
+
+
+# ============================================================
 # Main routing
 # ============================================================
 if st.session_state.user is None:
@@ -785,6 +903,7 @@ else:
             "history": page_history,
             "finance": page_finance,
             "receipt": page_receipt,
+            "cost": page_cost,
             "admin": page_admin,
         }
         page_fn = pages.get(st.session_state.page, page_generate)

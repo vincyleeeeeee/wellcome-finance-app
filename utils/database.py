@@ -267,15 +267,50 @@ def generate_project_code(code_date: str) -> str:
     Returns: e.g., 'WELL26071501'
     """
     sb = _get_sb()
-    # Parse date
     from datetime import datetime as dt
     d = dt.strptime(code_date, "%Y-%m-%d")
     prefix = f"WELL{d.strftime('%y%m%d')}"
-
-    # Count existing projects with this prefix
     result = sb.table("projects").select("id", count="exact").like("project_code", f"{prefix}%").execute()
     seq = (result.count or 0) + 1
     return f"{prefix}{seq:02d}"
+
+
+def get_latest_code_for_month(year: int, month: int) -> str:
+    """
+    Get the latest project code for a given year/month.
+    Returns: e.g., 'WELL260703' (prefix only, no day/seq) or None
+    """
+    sb = _get_sb()
+    prefix = f"WELL{year % 100:02d}{month:02d}"
+    result = sb.table("projects").select("project_code").like("project_code", f"{prefix}%").order("project_code", desc=True).limit(1).execute()
+    if result.data:
+        return result.data[0]["project_code"]
+    return None
+
+
+def get_next_code_for_month(year: int, month: int) -> str:
+    """
+    Get the next available project code for a given month.
+    Uses the earliest unused day+sequence combination.
+    Returns: e.g., 'WELL26080101'
+    """
+    sb = _get_sb()
+    from datetime import datetime as dt
+    prefix = f"WELL{year % 100:02d}{month:02d}"
+
+    # Count all projects for this month
+    result = sb.table("projects").select("id", count="exact").like("project_code", f"{prefix}%").execute()
+    count = (result.count or 0)
+
+    # Use the first day of month as the date part
+    first_day = dt(year, month, 1)
+    day_prefix = first_day.strftime('%y%m%d')
+
+    # Count how many already use this day prefix
+    day_result = sb.table("projects").select("id", count="exact").like("project_code", f"WELL{day_prefix}%").execute()
+    day_count = (day_result.count or 0)
+
+    return f"WELL{day_prefix}{day_count + 1:02d}"
 
 
 def get_pending_approvals() -> List[Dict]:
