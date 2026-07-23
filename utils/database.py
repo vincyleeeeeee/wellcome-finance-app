@@ -10,15 +10,18 @@ from supabase import create_client
 
 def _get_config():
     """Get Supabase config from Streamlit secrets or env vars."""
+    # Try Streamlit secrets first
     try:
         import streamlit as st
-        if hasattr(st, 'secrets'):
-            url = st.secrets.get('SUPABASE_URL', '')
-            key = st.secrets.get('SUPABASE_KEY', '')
-            if url and key:
-                return url, key
+        url = st.secrets.get('SUPABASE_URL', '') if hasattr(st, 'secrets') else ''
+        key = st.secrets.get('SUPABASE_KEY', '') if hasattr(st, 'secrets') else ''
+        if not url:
+            url = st.secrets.get('SUPABASE_URL', '') if hasattr(st, 'secrets') else ''
+        if url and key:
+            return url, key
     except Exception:
         pass
+    # Fall back to env vars
     return os.environ.get("SUPABASE_URL", ""), os.environ.get("SUPABASE_KEY", "")
 
 
