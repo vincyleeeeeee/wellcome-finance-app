@@ -522,6 +522,16 @@ def page_history():
     st.title("📋 项目历史")
     user = st.session_state.user
 
+    # Show rejected projects that need attention
+    rejected_mine = [p for p in get_projects(limit=200) if p.get('status') == 'rejected' and p.get('created_by') == user['id']]
+    if rejected_mine:
+        for rp in rejected_mine:
+            st.warning(f"⚠️ 你的项目 **{rp.get('brand_name','')}** ({rp.get('project_code','')}) 已被驳回，请修改后重新提交")
+            if st.button("📤 重新提交", key=f"resubmit_{rp['id']}"):
+                submit_for_approval(rp['id'])
+                st.success(f"已重新提交 {rp.get('project_code','')}")
+                st.rerun()
+
     # Filter: show my projects or all
     show_all = st.checkbox("显示所有项目", value=(user['role'] in ('admin', 'finance')))
     projects = get_projects(limit=200)

@@ -295,7 +295,7 @@ def generate_project_code(code_date: str) -> str:
     prefix = f"WELL{d.strftime('%y%m%d')}"
     result = sb.table("projects").select("id", count="exact").like("project_code", f"{prefix}%").execute()
     seq = (result.count or 0) + 1
-    return f"{prefix}{seq:02d}"
+    return f"{prefix}{seq:03d}"
 
 
 def get_next_code_for_month(year: int, month: int) -> str:
@@ -311,7 +311,7 @@ def get_next_code_for_month(year: int, month: int) -> str:
     day_prefix = first_day.strftime('%y%m%d')
     day_result = sb.table("projects").select("id", count="exact").like("project_code", f"WELL{day_prefix}%").execute()
     day_count = (day_result.count or 0)
-    return f"WELL{day_prefix}{day_count + 1:02d}"
+    return f"WELL{day_prefix}{day_count + 1:03d}"
 
 
 # ============================================================
