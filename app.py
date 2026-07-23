@@ -849,13 +849,25 @@ def _receipt_form(client, project):
                 'gained_date': gained_date,
                 'payment_method': payment_method,
                 'issuer_name': issuer,
-                'venue': default_venue,
-                'project_date': default_period,
             }
 
-            # Generate receipt PDF directly (no LibreOffice needed)
+            # 1) Generate xlsx from correct template
+            import tempfile, io
             try:
-                import tempfile
+                xlsx_path = generate_cash_receipt(
+                    {'full_name': client.get('full_name', ''), 'address': client.get('address', ''),
+                     'contact': client.get('contact', ''), 'phone': client.get('phone', ''),
+                     'email': client.get('email', '')},
+                    receipt_data
+                )
+                with open(xlsx_path, 'rb') as fx:
+                    st.session_state['receipt_xlsx'] = fx.read()
+                st.session_state['receipt_xlsx_name'] = os.path.basename(xlsx_path)
+            except Exception:
+                st.session_state['receipt_xlsx'] = None
+
+            # 2) Generate stamped PDF
+            try:
                 stamped_name = tempfile.mktemp(suffix=".pdf", prefix=f"receipt_{receipt_data['brand_name']}_")
                 generate_receipt_pdf(
                     {'full_name': client['full_name'], 'address': client.get('address', ''),
@@ -874,15 +886,19 @@ def _receipt_form(client, project):
     if 'receipt_stamped' in st.session_state and st.session_state['receipt_stamped']:
         path = st.session_state['receipt_stamped']
         if os.path.exists(path):
-            with open(path, "rb") as f:
-                st.download_button(
-                    "📥 下载盖章收据 PDF", f,
-                    file_name=os.path.basename(path),
-                    use_container_width=True
-                )
-            st.caption(f"文件位置: {path}")
+            col_a, col_b = st.columns(2)
+            with col_a:
+                with open(path, "rb") as f:
+                    st.download_button("📥 下载盖章收据 PDF", f, file_name=os.path.basename(path), use_container_width=True)
+            with col_b:
+                if st.session_state.get('receipt_xlsx'):
+                    st.download_button("📥 下载收据 Excel", st.session_state['receipt_xlsx'],
+                                      file_name=st.session_state.get('receipt_xlsx_name', 'receipt.xlsx'),
+                                      use_container_width=True,
+                                      mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             if st.button("清除提示"):
                 st.session_state['receipt_stamped'] = None
+                st.session_state['receipt_xlsx'] = None
                 st.rerun()
 
 
