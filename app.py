@@ -22,6 +22,7 @@ from utils.generate import (
     generate_cash_receipt
 )
 from utils.pdf_utils import generate_stamped_pdf
+from utils.receipt_pdf import generate_receipt_pdf
 
 # ============================================================
 # Page config
@@ -548,6 +549,58 @@ def page_history():
 # ============================================================
 # Finance Approval Page
 # ============================================================
+def _regenerate_invoice_xlsx(client: dict, project: dict) -> bytes:
+    """Regenerate invoice xlsx from data, return bytes."""
+    import io
+    from utils.generate import TEMPLATE_DIR
+    import openpyxl
+
+    wb = openpyxl.load_workbook(os.path.join(TEMPLATE_DIR, "Invoice-Template.xlsx"))
+    ws = wb.active
+    currency = project.get('currency', 'USD')
+    amount = project.get('amount', 0)
+
+    ws['C3'] = f"{project.get('brand_name','')} – {project.get('total_posts','')} CONTENT PACKAGE"
+    ws['C4'] = project.get('execution_period', '')
+    ws['C5'] = project.get('venue', '')
+    ws['C7'] = client.get('full_name', '')
+    ws['C8'] = client.get('address', '')
+    ws['C9'] = client.get('contact', '')
+    ws['C10'] = client.get('phone') if client.get('phone') and client['phone'] != '（待补充）' else None
+    ws['C11'] = client.get('email') if client.get('email') and client['email'] != '（待补充）' else None
+    ws['E8'] = project.get('project_code', '')
+    ws['E9'] = project.get('invoice_date', '')
+    ws['E10'] = project.get('due_date', '')
+    ws['E11'] = project.get('project_code', '')
+    ws['D15'] = amount; ws['E15'] = 1; ws['G15'] = amount
+    ws['C18'] = f"Payment of {currency} {amount:,.2f}"
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.read()
+
+
+def _regenerate_stamped_pdf_from_data(client: dict, project: dict) -> bytes:
+    """Generate stamped invoice PDF from data."""
+    import io, tempfile
+    xlsx_bytes = _regenerate_invoice_xlsx(client, project)
+    with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f:
+        f.write(xlsx_bytes)
+        xlsx_path = f.name
+    pdf_path = tempfile.mktemp(suffix='.pdf')
+    try:
+        from utils.pdf_utils import generate_stamped_pdf
+        generate_stamped_pdf(xlsx_path, pdf_path)
+        with open(pdf_path, 'rb') as f:
+            return f.read()
+    finally:
+        try: os.unlink(xlsx_path)
+        except: pass
+        try: os.unlink(pdf_path)
+        except: pass
+
+
 def page_finance():
     st.title("💰 财务审核")
     user = st.session_state.user
@@ -577,47 +630,50 @@ def page_finance():
                           f"提交人: {p.get('created_by_name','?')} | "
                           f"提交时间: {p['created_at']}")
 
-                # Show invoice path
-                client_short = p['client_short']
-                brand = p['brand_name']
-                total_posts = p.get('total_posts', '')
-                expected_inv = f"{brand}-{total_posts.replace(' ', '-')}-invoice.xlsx"
-                inv_path = os.path.join("/Users/vincy/Documents/Wellcome/项目",
-                                        client_short, brand, "财务", expected_inv)
-
-                if os.path.exists(inv_path):
-                    with open(inv_path, "rb") as f:
+                # Regenerate invoice file for download (works on cloud)
+                try:
+                    client = get_client_by_id(p['client_id']) or {}
+                    if client:
+                        inv_bytes = _regenerate_invoice_xlsx(client, p)
+                        brand = p.get('brand_name', 'project')
+                        fname = f"{brand}-{p.get('project_code','invoice')}.xlsx"
                         st.download_button(
                             f"📥 下载 Invoice (审核用)",
-                            f, file_name=expected_inv,
-                            key=f"dl_{p['id']}"
+                            inv_bytes, file_name=fname,
+                            key=f"dl_{p['id']}",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                         )
+                    else:
+                        st.caption("⚠️ 客户信息缺失")
+                except Exception as e:
+                    st.caption(f"生成失败: {e}")
 
             with col2:
                 st.write("")  # spacer
                 st.write("")
                 if st.button("✅ 通过", key=f"approve_{p['id']}", use_container_width=True, type="primary"):
-                    output_dir = os.path.dirname(inv_path)
-                    stamped_name = f"{brand}-{total_posts.replace(' ', '-')}-stamped.pdf"
-                    stamped_path = os.path.join(output_dir, stamped_name)
-
-                    if os.path.exists(inv_path):
+                    client = get_client_by_id(p.get('client_id')) or {}
+                    if not client:
+                        st.error("找不到客户信息")
+                    else:
                         with st.spinner("正在生成盖章 PDF..."):
                             try:
-                                generate_stamped_pdf(inv_path, stamped_path)
+                                pdf_bytes = _regenerate_stamped_pdf_from_data(client, p)
+                                # Save to temp and store path
+                                import tempfile
+                                stamped_path = tempfile.mktemp(suffix=".pdf", prefix=f"approved_{p['project_code']}_")
+                                with open(stamped_path, 'wb') as f:
+                                    f.write(pdf_bytes)
                                 approve_project(p['id'], user['id'], stamped_path)
-                                # Store for immediate download
+                                fname = f"{p.get('brand_name','')}-{p.get('project_code','')}-stamped.pdf"
                                 st.session_state['just_approved'] = {
-                                    'name': stamped_name,
-                                    'path': stamped_path,
-                                    'brand': brand,
+                                    'name': fname, 'path': stamped_path,
+                                    'brand': p.get('brand_name',''),
                                     'code': p['project_code']
                                 }
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"生成失败: {e}")
-                    else:
-                        st.error(f"找不到 Invoice 文件")
 
                 if st.button("❌ 驳回", key=f"reject_{p['id']}", use_container_width=True):
                     reject_project(p['id'], user['id'])
@@ -789,19 +845,17 @@ def _receipt_form(client, project):
                 'project_date': default_period,
             }
 
-            # Generate receipt xlsx
-            xlsx_path = generate_cash_receipt(
-                {'full_name': client['full_name'], 'address': client.get('address', ''),
-                 'contact': client.get('contact', ''), 'phone': client.get('phone', ''),
-                 'email': client.get('email', '')},
-                receipt_data
-            )
-
-            # Generate stamped PDF
-            stamped_dir = os.path.dirname(xlsx_path)
-            stamped_name = xlsx_path.replace('.xlsx', '-stamped.pdf')
+            # Generate receipt PDF directly (no LibreOffice needed)
             try:
-                generate_stamped_pdf(xlsx_path, stamped_name)
+                import tempfile
+                stamped_name = tempfile.mktemp(suffix=".pdf", prefix=f"receipt_{receipt_data['brand_name']}_")
+                generate_receipt_pdf(
+                    {'full_name': client['full_name'], 'address': client.get('address', ''),
+                     'contact': client.get('contact', ''), 'phone': client.get('phone', ''),
+                     'email': client.get('email', '')},
+                    receipt_data,
+                    stamped_name
+                )
                 st.success("✅ 收据已生成！")
                 st.session_state['receipt_stamped'] = stamped_name
                 st.rerun()
