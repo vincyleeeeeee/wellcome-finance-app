@@ -61,6 +61,7 @@ def page_overview():
         rows.append({
             '阶段': stage,
             '编号': p.get('project_code', ''),
+            '项目名称': (p.get('project_name','') or '')[:40],
             '品牌': p.get('brand_name', ''),
             '客户': p.get('client_short', ''),
             '金额': f"{p.get('currency','USD')} {p.get('amount',0):,.0f}",
