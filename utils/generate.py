@@ -2,14 +2,23 @@
 
 import os
 import datetime
+import tempfile
 from typing import Tuple
 from docx import Document
 from docx.oxml.ns import qn
 import openpyxl
 
-# Template paths (relative to Wellcome project)
-TEMPLATE_DIR = "/Users/vincy/Documents/Wellcome/项目/_模板"
-OUTPUT_BASE = "/Users/vincy/Documents/Wellcome/项目"
+# Template paths
+_APP_DIR = os.path.dirname(os.path.dirname(__file__))
+_LOCAL_TEMPLATE = os.path.join(_APP_DIR, "templates")
+if os.path.isdir(_LOCAL_TEMPLATE):
+    TEMPLATE_DIR = _LOCAL_TEMPLATE
+else:
+    TEMPLATE_DIR = "/Users/vincy/Documents/Wellcome/项目/_模板"
+
+# Output directory
+_IS_CLOUD = os.path.exists("/mount/src")
+OUTPUT_BASE = tempfile.gettempdir() if _IS_CLOUD else "/Users/vincy/Documents/Wellcome/项目"
 
 # Chinese number mapping
 _CN_DIGITS = ["零", "壹", "贰", "叁", "肆", "伍", "陆", "柒", "捌", "玖"]
