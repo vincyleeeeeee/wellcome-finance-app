@@ -322,6 +322,19 @@ def _client_form(client: "dict | None"):
 def page_generate():
     st.title("📄 生成确认函 & Invoice")
 
+    # Check if editing a rejected project
+    edit_id = st.session_state.get('edit_project_id')
+    edit_data = None
+    if edit_id:
+        edit_data = get_project_by_id(edit_id)
+        if edit_data:
+            st.info(f"🔧 正在编辑项目：**{edit_data.get('project_code','')}** {edit_data.get('brand_name','')}")
+            if st.button("❌ 取消编辑"):
+                del st.session_state['edit_project_id']
+                st.rerun()
+        else:
+            del st.session_state['edit_project_id']
+
     clients = get_clients()
     if not clients:
         st.warning("暂无客户，请先在「客户管理」中添加")
@@ -334,10 +347,16 @@ def page_generate():
 
     with col_left:
         st.subheader("项目信息")
-        selected_client = st.selectbox("客户简称 *", client_names)
+        # Pre-fill from edit data
+        default_client_idx = 0
+        if edit_data:
+            edit_client = get_client_by_id(edit_data.get('client_id'))
+            if edit_client and edit_client.get('short_name') in client_names:
+                default_client_idx = client_names.index(edit_client['short_name'])
+
+        selected_client = st.selectbox("客户简称 *", client_names, index=default_client_idx)
         client_info = client_map[selected_client]
 
-        # Show client preview
         phone_email = client_info['phone'] or client_info['email'] or '—'
         st.caption(f"📋 {client_info['full_name']}  |  联系人: {client_info['contact']}  |  {phone_email}")
 
@@ -359,15 +378,22 @@ def page_generate():
             except Exception:
                 latest = f"WELL{code_year % 100:02d}{code_month:02d}01XX"
         project_code = st.text_input("项目编号 *", value=latest, help="自动生成，可直接修改")
-        project_name = st.text_input("项目名称 *", placeholder="品牌名 – 月份UGC 篇数")
-        brand_name = st.text_input("客户品牌名 *", placeholder="品牌的社交媒体名")
-        currency = st.selectbox("币种", ["USD", "RMB"], index=0)
-        amount = st.number_input("项目金额 *", min_value=0.0, step=100.0, value=0.0)
+        project_name = st.text_input("项目名称 *", value=edit_data.get('project_name','') if edit_data else '',
+                                     placeholder="品牌名 – 月份UGC 篇数")
+        brand_name = st.text_input("客户品牌名 *", value=edit_data.get('brand_name','') if edit_data else '',
+                                   placeholder="品牌的社交媒体名")
+        default_cur_idx = 0 if (edit_data.get('currency','USD') == 'USD' if edit_data else True) else 1
+        currency = st.selectbox("币种", ["USD", "RMB"], index=default_cur_idx)
+        amount = st.number_input("项目金额 *", min_value=0.0, step=100.0,
+                                 value=float(edit_data.get('amount',0)) if edit_data else 0.0)
 
-        venue = st.text_input("执行地点", value="Bangkok", placeholder="城市")
-        execution_period = st.text_input("执行周期", placeholder="如 July – September 2026")
-        shooting_date = st.text_input("预计拍摄时间", placeholder="如 July 2026")
-        total_posts = st.text_input("总发布篇数", placeholder="如 150 PHOTO POSTS")
+        venue = st.text_input("执行地点", value=edit_data.get('venue','Bangkok') if edit_data else "Bangkok")
+        execution_period = st.text_input("执行周期", value=edit_data.get('execution_period','') if edit_data else '',
+                                         placeholder="如 July – September 2026")
+        shooting_date = st.text_input("预计拍摄时间", value=edit_data.get('shooting_date','') if edit_data else '',
+                                      placeholder="如 July 2026")
+        total_posts = st.text_input("总发布篇数", value=edit_data.get('total_posts','') if edit_data else '',
+                                    placeholder="如 150 PHOTO POSTS")
         due_date = st.date_input("到期日 *", value=datetime.now())
 
     with col_right:
@@ -470,8 +496,29 @@ def page_generate():
                         inv_path = generate_invoice(client_info, proj)
                         files['Invoice'] = inv_path
 
-                    # Save project record
-                    project_id = save_project(proj)
+                    # Save or update project record
+                    if edit_id:
+                        # Update existing project
+                        from utils.database import get_connection as _gc
+                        _gc().table("projects").update({
+                            "project_code": project_code,
+                            "project_name": project_name,
+                            "client_id": client_info['id'],
+                            "brand_name": brand_name,
+                            "amount": amount, "currency": currency,
+                            "venue": venue, "execution_period": execution_period,
+                            "shooting_date": shooting_date, "total_posts": total_posts,
+                            "content_type": content_type, "platform": platform,
+                            "status": "pending" if submit_approval else "draft",
+                            "estimated_cost": estimated_cost, "cost_currency": cost_currency,
+                            "cost_breakdown": cost_breakdown,
+                            "feishu_approved": feishu_approved,
+                            "expected_payment_date": expected_payment_date.strftime('%Y-%m-%d') if expected_payment_date else None,
+                        }).eq("id", edit_id).execute()
+                        project_id = edit_id
+                        del st.session_state['edit_project_id']
+                    else:
+                        project_id = save_project(proj)
 
                     # Generate emails
                     subj_conf, body_conf = ("", "")
@@ -570,6 +617,11 @@ def page_history():
                         with open(stamped, "rb") as f:
                             st.download_button("📥 盖章PDF", f, file_name=os.path.basename(stamped),
                                              key=f"hist_stamped_{p['id']}", use_container_width=True)
+                elif p.get('status') in ('draft', 'rejected') and user['id'] == p.get('created_by'):
+                    if st.button("📤 提交审核", key=f"submit_hist_{p['id']}", use_container_width=True):
+                        submit_for_approval(p['id'])
+                        st.success(f"已提交: {p.get('project_code','')}")
+                        st.rerun()
 
             # Row 2: editable fields (visible to project owner or finance/admin)
             if user['id'] == p.get('created_by') or user['role'] in ('finance', 'admin'):

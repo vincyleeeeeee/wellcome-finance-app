@@ -12,6 +12,18 @@ from utils.database import (
 from utils.receipt_pdf import generate_receipt_pdf
 from utils.generate import generate_cash_receipt
 
+
+def _fmt_cost_line(cost_json: str) -> str:
+    """Format cost breakdown as a single sentence."""
+    if not cost_json:
+        return ""
+    try:
+        import json
+        items = json.loads(cost_json)
+        return "、".join(f"{i['name']}({i.get('currency','RMB')}{i.get('amount',0):,.0f})" for i in items)
+    except Exception:
+        return cost_json
+
 # Status mapping with clear labels
 STAGE_MAP = {
     'draft': '📝 草稿',
@@ -147,9 +159,8 @@ def page_approval():
                          f"提交人: {p.get('created_by_name','?')} | "
                          f"{feishu_badge}")
                 if p.get('estimated_cost'):
-                    st.caption(f"预估成本: {p.get('cost_currency','USD')} {p.get('estimated_cost',0):,.2f}")
-                    if p.get('cost_breakdown'):
-                        st.caption(f"成本构成: {p['cost_breakdown'][:100]}")
+                    cost_detail = _fmt_cost_line(p.get('cost_breakdown', '') or '')
+                    st.caption(f"预估成本: RMB {p.get('estimated_cost',0):,.0f}" + (f"（{cost_detail}）" if cost_detail else ""))
                 st.caption(f"提交时间: {p.get('created_at','')[:10]} | 预计到账: {str(p.get('expected_payment_date',''))[:10] if p.get('expected_payment_date') else '未填写'}")
 
             with col_btn:
