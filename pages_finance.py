@@ -13,6 +13,64 @@ from utils.receipt_pdf import generate_receipt_pdf
 from utils.generate import generate_cash_receipt
 
 
+def _export_overview_excel(projects):
+    """Export project overview as Excel file."""
+    import io, json, openpyxl
+    from openpyxl.styles import Font, Alignment
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "成本明细"
+
+    headers = ['项目编号', '品牌', '客户', '阶段', '金额', '成本细项', '成本金额', '币种', '到账', '结案']
+    for c, h in enumerate(headers, 1):
+        cell = ws.cell(1, c, h)
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal='center')
+
+    row = 2
+    for p in projects:
+        stage = {'draft':'草稿','pending':'待审核','approved':'已开发票','rejected':'已驳回'}.get(p.get('status',''),'')
+        closure = {'active':'进行中','pending_payment':'待收款','closed':'已结案'}.get(p.get('closure_status',''),'')
+        paid = '是' if p.get('payment_received') else '否'
+
+        try:
+            items = json.loads(p.get('cost_breakdown','') or '[]')
+        except:
+            items = []
+
+        if items:
+            for item in items:
+                ws.cell(row, 1, p.get('project_code',''))
+                ws.cell(row, 2, p.get('brand_name',''))
+                ws.cell(row, 3, p.get('client_short',''))
+                ws.cell(row, 4, stage)
+                ws.cell(row, 5, f"{p.get('currency','USD')} {p.get('amount',0):,.0f}")
+                ws.cell(row, 6, item.get('name',''))
+                ws.cell(row, 7, item.get('amount',0))
+                ws.cell(row, 8, item.get('currency','RMB'))
+                ws.cell(row, 9, paid)
+                ws.cell(row, 10, closure)
+                row += 1
+        else:
+            ws.cell(row, 1, p.get('project_code',''))
+            ws.cell(row, 2, p.get('brand_name',''))
+            ws.cell(row, 3, p.get('client_short',''))
+            ws.cell(row, 4, stage)
+            ws.cell(row, 5, f"{p.get('currency','USD')} {p.get('amount',0):,.0f}")
+            ws.cell(row, 6, '')
+            ws.cell(row, 7, p.get('estimated_cost',0))
+            ws.cell(row, 8, 'RMB')
+            ws.cell(row, 9, paid)
+            ws.cell(row, 10, closure)
+            row += 1
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    st.download_button("📥 下载 Excel", buf, file_name="项目成本明细.xlsx",
+                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
 def _fmt_cost_line(cost_json: str) -> str:
     """Format cost breakdown as a single sentence."""
     if not cost_json:
@@ -61,6 +119,12 @@ def page_overview():
     c4.metric("🔒 已结案", closed_count)
 
     st.divider()
+
+    # === Download button ===
+    col_dl, _ = st.columns([1, 3])
+    with col_dl:
+        if st.button("📥 下载成本明细表", use_container_width=True):
+            _export_overview_excel(projects)
 
     # === Project list as expandable cards ===
     st.subheader("项目明细")
