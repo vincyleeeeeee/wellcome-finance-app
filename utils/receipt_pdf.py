@@ -2,6 +2,7 @@
 
 import os, io, shutil, subprocess, tempfile
 from datetime import datetime
+from PIL import Image as PILImage
 import openpyxl
 
 ISSUER = {
@@ -67,11 +68,14 @@ def generate_receipt_pdf(client: dict, receipt_data: dict, output_path: str = No
             break
 
     if stamp_file:
+        # Get stamp dimensions for 150% enlargement
+        stamp_pil = PILImage.open(stamp_file)
+        sw, sh = stamp_pil.size
         stamp_img = openpyxl.drawing.image.Image(stamp_file)
-        stamp_img.width = 180  # pixels in Excel
-        stamp_img.height = stamp_img.width * 471 / 1172  # maintain aspect ratio
-        # Place near rows 13-15, columns E-F (right side, above Name)
-        stamp_img.anchor = 'E13'
+        stamp_img.width = 250
+        stamp_img.height = int(250 * sh / sw)
+        # Place on Name area: row 16-17, column D-F (right-center)
+        stamp_img.anchor = 'D16'
         ws.add_image(stamp_img)
 
     # Save filled xlsx with stamp embedded

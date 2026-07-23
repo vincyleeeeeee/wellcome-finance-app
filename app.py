@@ -370,7 +370,18 @@ def page_generate():
                                               help="客户的预计付款日期，用于财务跟踪")
         estimated_cost = st.number_input("预估成本金额", min_value=0.0, step=100.0, value=0.0)
         cost_currency = st.selectbox("成本币种", ["USD", "RMB"], key="cost_currency")
-        cost_breakdown = st.text_area("成本构成", placeholder="如：KOL费用 2000, 拍摄 500, 剪辑 300...")
+        st.caption("成本构成（可多选）")
+        cost_items = []
+        cc1, cc2 = st.columns(2)
+        with cc1:
+            if st.checkbox("拍摄"): cost_items.append("拍摄")
+            if st.checkbox("餐饮交通"): cost_items.append("餐饮交通")
+        with cc2:
+            if st.checkbox("发布"): cost_items.append("发布")
+            if st.checkbox("补发"): cost_items.append("补发")
+        cost_custom = st.text_input("其他（自定义）", placeholder="如：KOL费用")
+        if cost_custom: cost_items.append(cost_custom)
+        cost_breakdown = "、".join(cost_items) if cost_items else ""
 
         st.divider()
 

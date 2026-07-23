@@ -1,46 +1,26 @@
-"""PDF generation: convert xlsx to PDF and overlay electronic stamp."""
+"""PDF utilities — xlsx→PDF via LibreOffice."""
 
-import os
-import shutil
-import subprocess
-import tempfile
-import random
+import os, shutil, subprocess, tempfile, random, io
 from PIL import Image
 import numpy as np
-
-STAMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "stamp")
-STAMP_PATH = os.path.join(STAMP_DIR, "stamp_final.png")
+import openpyxl
 
 
-def _find_soffice() -> str:
-    """Find LibreOffice soffice binary."""
-    for path in [
-        "/opt/homebrew/bin/soffice",
-        "soffice",
-        "/usr/bin/soffice",
-        "/usr/lib/libreoffice/program/soffice",
-    ]:
-        if shutil.which(path) or os.path.exists(path):
-            return path
+def _find_soffice():
+    for p in ["/opt/homebrew/bin/soffice", "soffice", "/usr/bin/soffice"]:
+        if shutil.which(p) or os.path.exists(p):
+            return p
     return "soffice"
 
 
 def xlsx_to_pdf(xlsx_path: str, output_dir: str = None) -> str:
-    """Convert xlsx to PDF using LibreOffice headless. Returns PDF path."""
+    """Convert xlsx to PDF using LibreOffice headless."""
     if output_dir is None:
         output_dir = tempfile.mkdtemp()
-
-    cmd = [
-        _find_soffice(),
-        "--headless",
-        "--convert-to", "pdf",
-        "--outdir", output_dir,
-        xlsx_path
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    cmd = [_find_soffice(), "--headless", "--convert-to", "pdf", "--outdir", output_dir, xlsx_path]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if result.returncode != 0:
         raise RuntimeError(f"LibreOffice failed: {result.stderr}")
-
     base = os.path.splitext(os.path.basename(xlsx_path))[0]
     pdf_path = os.path.join(output_dir, base + ".pdf")
     if not os.path.exists(pdf_path):
@@ -48,61 +28,53 @@ def xlsx_to_pdf(xlsx_path: str, output_dir: str = None) -> str:
     return pdf_path
 
 
-def overlay_stamp_on_pdf(pdf_path: str, output_path: str, stamp_path: str = None) -> str:
-    """
-    Overlay electronic stamp onto PDF pages at bottom-right.
-    Renders PDF to image, overlays stamp, saves back to PDF.
-    """
+def generate_stamped_pdf(xlsx_path: str, output_path: str, stamp_path: str = None) -> str:
+    """Embed stamp into xlsx, then convert to PDF via LibreOffice. Works on cloud."""
+    # Find stamp
     if stamp_path is None:
-        stamp_path = STAMP_PATH
+        for p in [
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), "stamp", "stamp_final.png"),
+            "/Users/vincy/Documents/Wellcome/invoice-app/stamp/stamp_final.png",
+        ]:
+            if os.path.exists(p):
+                stamp_path = p
+                break
 
-    if not os.path.exists(stamp_path):
-        raise FileNotFoundError(f"印章文件不存在: {stamp_path}")
+    # Open xlsx and insert stamp
+    wb = openpyxl.load_workbook(xlsx_path)
+    ws = wb.active
 
-    from pdf2image import convert_from_path
+    if stamp_path and os.path.exists(stamp_path):
+        # Get stamp dimensions
+        stamp_img = Image.open(stamp_path)
+        sw, sh = stamp_img.size
 
-    stamp_img = Image.open(stamp_path).convert("RGBA")
+        # Insert stamp image near bottom-right (row ~30, column E-F)
+        img = openpyxl.drawing.image.Image(stamp_path)
+        # 150% enlarged: target width ~250px
+        img.width = 250
+        img.height = int(250 * sh / sw)
+        # Position at bottom-right (around row 30-33)
+        img.anchor = 'E30'
+        ws.add_image(img)
 
-    # Render PDF pages at high DPI
-    images = convert_from_path(pdf_path, dpi=200)
+    # Save modified xlsx
+    xlsx_buf = io.BytesIO()
+    wb.save(xlsx_buf)
+    xlsx_buf.seek(0)
 
-    stamped_images = []
-    for page_img in images:
-        pw, ph = page_img.size
+    with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f:
+        f.write(xlsx_buf.read())
+        xlsx_stamped = f.name
 
-        # Stamp size: ~19% of page width, keep aspect ratio
-        stamp_w = int(pw * 0.19)
-        ratio = stamp_w / stamp_img.width
-        stamp_h = int(stamp_img.height * ratio)
-        stamp_resized = stamp_img.resize((stamp_w, stamp_h), Image.LANCZOS)
-
-        # Position: bottom-right corner, above the company name
-        margin_x = int(pw * 0.04) + random.randint(-15, 15)
-        margin_y = int(ph * 0.06) + random.randint(-10, 10)
-        x = pw - stamp_w - margin_x
-        y = ph - stamp_h - margin_y
-
-        # Paste stamp at calculated position
-        page_rgba = page_img.convert("RGBA")
-        page_rgba.paste(stamp_resized, (x, y), stamp_resized)
-        stamped_images.append(page_rgba)
-
-    # Save as PDF (multi-page if needed)
-    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-    first = stamped_images[0].convert("RGB")
-    rest = [img.convert("RGB") for img in stamped_images[1:]]
-    first.save(output_path, "PDF", save_all=True, append_images=rest)
+    # Convert to PDF
+    try:
+        outdir = tempfile.mkdtemp()
+        pdf_tmp = xlsx_to_pdf(xlsx_stamped, outdir)
+        with open(pdf_tmp, 'rb') as src, open(output_path, 'wb') as dst:
+            dst.write(src.read())
+    finally:
+        try: os.unlink(xlsx_stamped)
+        except: pass
 
     return output_path
-
-
-def generate_stamped_pdf(xlsx_path: str, output_path: str, stamp_path: str = None) -> str:
-    """Full pipeline: xlsx → PDF → stamp → stamped PDF."""
-    pdf_dir = tempfile.mkdtemp()
-    try:
-        pdf_path = xlsx_to_pdf(xlsx_path, pdf_dir)
-        result = overlay_stamp_on_pdf(pdf_path, output_path, stamp_path)
-        return result
-    finally:
-        import shutil
-        shutil.rmtree(pdf_dir, ignore_errors=True)
