@@ -372,15 +372,15 @@ def page_generate():
             if code_month < datetime.now().month:
                 code_year += 1  # if user selects earlier month, assume next year
         with col_show:
-        if edit_data and edit_data.get('project_code'):
-            project_code = st.text_input("项目编号 *", value=edit_data['project_code'])
-        else:
-            try:
-                latest = get_next_code_for_month(code_year, code_month)
-                st.success(f"📝 **{code_month}月** 下一个可用编号：**{latest}**（实时，不会重复）")
-            except Exception:
-                latest = f"WELL{code_year % 100:02d}{code_month:02d}01XX"
-            project_code = st.text_input("项目编号 *", value=latest, help="自动生成，可直接修改")
+            if edit_data and edit_data.get('project_code'):
+                project_code = st.text_input("项目编号 *", value=edit_data['project_code'])
+            else:
+                try:
+                    latest = get_next_code_for_month(code_year, code_month)
+                    st.success(f"📝 **{code_month}月** 下一个可用编号：**{latest}**（实时，不会重复）")
+                except Exception:
+                    latest = f"WELL{code_year % 100:02d}{code_month:02d}01XX"
+                project_code = st.text_input("项目编号 *", value=latest, help="自动生成，可直接修改")
         project_name = st.text_input("项目名称 *", value=edit_data.get('project_name','') if edit_data else '',
                                      placeholder="品牌名 – 月份UGC 篇数")
         brand_name = st.text_input("客户品牌名 *", value=edit_data.get('brand_name','') if edit_data else '',
