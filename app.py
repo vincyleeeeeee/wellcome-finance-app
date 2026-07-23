@@ -25,6 +25,18 @@ from utils.pdf_utils import generate_stamped_pdf
 from utils.receipt_pdf import generate_receipt_pdf
 from pages_finance import page_overview, page_approval
 
+
+def _fmt_cost(cost_json: str) -> str:
+    """Format cost breakdown JSON for display."""
+    if not cost_json:
+        return ""
+    try:
+        import json
+        items = json.loads(cost_json)
+        return "、".join(f"{i['name']}({i['currency']}{i['amount']:,.0f})" for i in items)
+    except Exception:
+        return cost_json
+
 # ============================================================
 # Page config
 # ============================================================
@@ -370,20 +382,46 @@ def page_generate():
         submit_approval = st.checkbox("生成后提交财务审核", value=not feishu_approved)
         expected_payment_date = st.date_input("预计客户到账时间", value=None,
                                               help="客户的预计付款日期，用于财务跟踪")
-        estimated_cost = st.number_input("预估成本金额", min_value=0.0, step=100.0, value=0.0)
-        cost_currency = st.selectbox("成本币种", ["USD", "RMB"], key="cost_currency")
-        st.caption("成本构成（可多选）")
-        cost_items = []
-        cc1, cc2 = st.columns(2)
-        with cc1:
-            if st.checkbox("拍摄"): cost_items.append("拍摄")
-            if st.checkbox("餐饮交通"): cost_items.append("餐饮交通")
-        with cc2:
-            if st.checkbox("发布"): cost_items.append("发布")
-            if st.checkbox("补发"): cost_items.append("补发")
-        cost_custom = st.text_input("其他（自定义）", placeholder="如：KOL费用")
-        if cost_custom: cost_items.append(cost_custom)
-        cost_breakdown = "、".join(cost_items) if cost_items else ""
+        # === Cost breakdown with individual amounts ===
+        st.caption("成本构成（勾选后填入金额）")
+        RATES = {"USD": 7.2, "RMB": 1.0, "THB": 0.2, "MYR": 1.55}
+
+        cost_items_data = []  # list of {name, amount, currency}
+        total_rmb = 0.0
+
+        cost_cats = ["拍摄", "餐饮交通", "发布", "补发"]
+        for cat in cost_cats:
+            use_cat = st.checkbox(cat, key=f"cost_{cat}")
+            if use_cat:
+                cc1, cc2 = st.columns([2, 1])
+                with cc1:
+                    amt = st.number_input(f"{cat}金额", min_value=0.0, step=100.0, key=f"amt_{cat}")
+                with cc2:
+                    cur = st.selectbox("币种", ["USD", "RMB", "THB", "MYR"], key=f"cur_{cat}")
+                if amt > 0:
+                    total_rmb += amt * RATES.get(cur, 1)
+                    cost_items_data.append({"name": cat, "amount": amt, "currency": cur})
+
+        # Custom item
+        custom_name = st.text_input("其他项名称", placeholder="如：KOL费用", key="cost_custom_name")
+        if custom_name:
+            cc1, cc2 = st.columns([2, 1])
+            with cc1:
+                custom_amt = st.number_input(f"{custom_name}金额", min_value=0.0, step=100.0, key="amt_custom")
+            with cc2:
+                custom_cur = st.selectbox("币种", ["USD", "RMB", "THB", "MYR"], key="cur_custom")
+            if custom_amt > 0:
+                total_rmb += custom_amt * RATES.get(custom_cur, 1)
+                cost_items_data.append({"name": custom_name, "amount": custom_amt, "currency": custom_cur})
+
+        if total_rmb > 0:
+            st.info(f"💰 预估总成本（人民币）：**¥{total_rmb:,.0f}**")
+
+        # Store as structured JSON string
+        import json
+        cost_breakdown = json.dumps(cost_items_data, ensure_ascii=False) if cost_items_data else ""
+        estimated_cost = total_rmb
+        cost_currency = "RMB"
 
         st.divider()
 
@@ -645,8 +683,9 @@ def page_finance():
                 cost_info = ""
                 if p.get('estimated_cost'):
                     cost_info = f" | 成本: {p.get('cost_currency','USD')} {p['estimated_cost']:,.2f}"
-                    if p.get('cost_breakdown'):
-                        cost_info += f" ({p['cost_breakdown'][:50]})"
+                    cb = _fmt_cost(p.get('cost_breakdown', '') or '')
+                    if cb:
+                        cost_info += f" ({cb[:80]})"
                 feishu_badge = " ✅飞书已立项" if p.get('feishu_approved') else " ⚠️未确认飞书立项"
                 st.caption(f"编号: {p['project_code']} | 客户: {p['client_short']} | "
                           f"金额: {p.get('currency','USD')} {p['amount']:,.2f}{cost_info} | "
