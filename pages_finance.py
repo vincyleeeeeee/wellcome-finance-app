@@ -56,21 +56,36 @@ def page_overview():
         stage = STAGE_MAP.get(p.get('status', ''), p.get('status', '?'))
         closure = CLOSURE_MAP.get(p.get('closure_status', 'active'), '进行中')
         paid = '✅' if p.get('payment_received') else ''
-        feishu = '✅' if p.get('feishu_approved') else ''
 
-        rows.append({
+        base = {
             '阶段': stage,
             '编号': p.get('project_code', ''),
-            '项目名称': (p.get('project_name','') or '')[:40],
             '品牌': p.get('brand_name', ''),
             '客户': p.get('client_short', ''),
             '金额': f"{p.get('currency','USD')} {p.get('amount',0):,.0f}",
-            '成本': f"{p.get('cost_currency','USD')} {p.get('estimated_cost',0):,.0f}" if p.get('estimated_cost') else '-',
-            '预计到账': str(p.get('expected_payment_date', ''))[:10] if p.get('expected_payment_date') else '-',
-            '飞书立项': feishu,
-            '已到账': paid,
             '结案': closure,
-        })
+            '到账': paid,
+        }
+
+        # Parse cost breakdown: split into individual items
+        try:
+            import json
+            cost_items = json.loads(p.get('cost_breakdown', '') or '[]')
+        except Exception:
+            cost_items = []
+
+        if cost_items:
+            for item in cost_items:
+                row = dict(base)
+                row['成本细项'] = item.get('name', '')
+                row['成本金额'] = f"{item.get('currency','RMB')} {item.get('amount',0):,.0f}"
+                rows.append(row)
+        else:
+            # No cost items: show one row with empty cost
+            row = dict(base)
+            row['成本细项'] = ''
+            row['成本金额'] = f"RMB {p.get('estimated_cost',0):,.0f}" if p.get('estimated_cost') else '-'
+            rows.append(row)
 
     df = pd.DataFrame(rows)
     st.dataframe(df, use_container_width=True, hide_index=True, height=600)
