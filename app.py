@@ -23,6 +23,7 @@ from utils.generate import (
 )
 from utils.pdf_utils import generate_stamped_pdf
 from utils.receipt_pdf import generate_receipt_pdf
+from pages_finance import page_overview, page_approval
 
 # ============================================================
 # Page config
@@ -101,20 +102,21 @@ def render_sidebar():
                      type="primary" if st.session_state.page == "history" else "secondary"):
             st.session_state.page = "history"
 
-        # Finance users see approval + receipt pages
+        # Finance users: simple, clear pages
         if user['role'] in ('finance', 'admin'):
             st.divider()
+            st.markdown("**💰 财务专区**")
+            if st.button("📊 项目总览", use_container_width=True,
+                         type="primary" if st.session_state.page == "overview" else "secondary"):
+                st.session_state.page = "overview"
             p = len(get_pending_approvals())
-            label = f"💰 财务审核" + (f" ({p})" if p else "")
+            label = f"⏳ 待审核" + (f" ({p})" if p else "")
             if st.button(label, use_container_width=True,
-                         type="primary" if st.session_state.page == "finance" else "secondary"):
-                st.session_state.page = "finance"
-            if st.button("🧾 开具收据", use_container_width=True,
+                         type="primary" if st.session_state.page == "approval" else "secondary"):
+                st.session_state.page = "approval"
+            if st.button("🧾 开收据", use_container_width=True,
                          type="primary" if st.session_state.page == "receipt" else "secondary"):
                 st.session_state.page = "receipt"
-            if st.button("📊 成本总览", use_container_width=True,
-                         type="primary" if st.session_state.page == "cost" else "secondary"):
-                st.session_state.page = "cost"
 
         if user['role'] == 'admin':
             pending = len(get_pending_users())
@@ -1084,9 +1086,9 @@ else:
             "generate": page_generate,
             "clients": page_clients,
             "history": page_history,
-            "finance": page_finance,
+            "overview": page_overview,
+            "approval": page_approval,
             "receipt": page_receipt,
-            "cost": page_cost,
             "admin": page_admin,
         }
         page_fn = pages.get(st.session_state.page, page_generate)
