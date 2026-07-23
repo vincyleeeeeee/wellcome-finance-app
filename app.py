@@ -385,7 +385,7 @@ def page_generate():
         default_cur_idx = 0 if (edit_data.get('currency','USD') == 'USD' if edit_data else True) else 1
         currency = st.selectbox("币种", ["USD", "RMB"], index=default_cur_idx)
         amount = st.number_input("项目金额 *", min_value=0.0, step=100.0,
-                                 value=float(edit_data.get('amount',0)) if edit_data else 0.0)
+                                 value=float(edit_data.get('amount',0)) if edit_data else None)
 
         venue = st.text_input("执行地点", value=edit_data.get('venue','Bangkok') if edit_data else "Bangkok")
         execution_period = st.text_input("执行周期", value=edit_data.get('execution_period','') if edit_data else '',
@@ -421,7 +421,7 @@ def page_generate():
             if use_cat:
                 cc1, cc2 = st.columns([2, 1])
                 with cc1:
-                    amt = st.number_input(f"{cat}金额", min_value=0.0, step=100.0, key=f"amt_{cat}")
+                    amt = st.number_input(f"{cat}金额", min_value=0.0, step=100.0, value=None, key=f"amt_{cat}")
                 with cc2:
                     cur = st.selectbox("币种", ["RMB", "USD", "THB", "MYR"], key=f"cur_{cat}")
                 if amt > 0:
@@ -433,7 +433,7 @@ def page_generate():
         if custom_name:
             cc1, cc2 = st.columns([2, 1])
             with cc1:
-                custom_amt = st.number_input(f"{custom_name}金额", min_value=0.0, step=100.0, key="amt_custom")
+                custom_amt = st.number_input(f"{custom_name}金额", min_value=0.0, step=100.0, value=None, key="amt_custom")
             with cc2:
                 custom_cur = st.selectbox("币种", ["RMB", "USD", "THB", "MYR"], key="cur_custom")
             if custom_amt > 0:
@@ -855,7 +855,7 @@ def page_finance():
             with col_b:
                 rcv_date = st.date_input("到账日期", value=datetime.now(), key="rcv_date")
             with col_c:
-                rcv_amount = st.number_input("到账金额", min_value=0.0, value=0.0, step=100.0, key="rcv_amount")
+                rcv_amount = st.number_input("到账金额", min_value=0.0, value=None, step=100.0, key="rcv_amount")
                 if st.button("✅ 标记到账", type="primary", use_container_width=True):
                     p = proj_options[selected]
                     sb = get_connection()
@@ -949,7 +949,7 @@ def _receipt_form(client, project):
         gained_date = st.date_input("到款日期", value=datetime.now())
         payment_method = st.selectbox("付款方式", ["BANK", "CASH", "TRANSFER"])
         payment_amount = st.number_input("实收金额", min_value=0.0,
-                                         value=float(default_amount) if default_amount > 0 else 0.0, step=100.0)
+                                         value=float(default_amount) if default_amount > 0 else None, step=100.0)
         currency = st.selectbox("币种", ["USD", "RMB"],
                                 index=0 if default_currency == "USD" else 1)
 
