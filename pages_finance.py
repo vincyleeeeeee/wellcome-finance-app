@@ -277,36 +277,30 @@ def page_approval():
                             try:
                                 _regen_and_approve(p, user['id'])
                                 st.success("已通过！")
-                                # Show email template
                                 code = p.get('project_code','')
                                 month_str = code[6:8] if len(code)>=8 else ''
                                 MONTHS = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
                                           '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
                                 m = MONTHS.get(month_str,'')
                                 subj = f"Invoice for {p.get('brand_name','')} {m} Campaign / {p.get('project_code','')}"
-                                body = f"""Dear all,
-
-Please find attached the invoice for **{p.get('brand_name','')} {p.get('project_name','')}** Project.
-
-Amount: {p.get('currency','USD')} {p.get('amount',0):,.2f}
-Invoice No: {p.get('project_code','')}
-
-Please review at your convenience and let us know if you have any questions.
-Thank you for your kind attention."""
-
+                                body = (f"Dear all,\n\n"
+                                        f"Please find attached the invoice for {p.get('brand_name','')} {p.get('project_name','')} Project.\n\n"
+                                        f"Amount: {p.get('currency','USD')} {p.get('amount',0):,.2f}\n"
+                                        f"Invoice No: {p.get('project_code','')}\n\n"
+                                        f"Please review at your convenience and let us know if you have any questions.\n"
+                                        f"Thank you for your kind attention.")
                                 st.session_state['just_approved'] = {
-                                'name': f"{p.get('brand_name','')}-{m}-invoice.pdf",
-                                'path': tempfile.mktemp(suffix='.pdf'),
-                                'brand': p.get('brand_name',''),
-                                'code': p.get('project_code',''),
-                                'email_subj': subj, 'email_body': body,
+                                    'name': f"{p.get('brand_name','')}-{m}-invoice.pdf",
+                                    'path': tempfile.mktemp(suffix='.pdf'),
+                                    'brand': p.get('brand_name',''),
+                                    'code': p.get('project_code',''),
+                                    'email_subj': subj, 'email_body': body,
                                 }
-                                # Generate stamped PDF for download
                                 _gen_stamped_only(p, st.session_state['just_approved']['path'])
                                 st.rerun()
                             except Exception as e: st.error(f"失败: {e}")
                     if st.button("❌ 驳回", key=f"no_{p['id']}", use_container_width=True):
-                    reject_project(p['id'], user['id']); st.warning("已驳回"); st.rerun()
+                        reject_project(p['id'], user['id']); st.warning("已驳回"); st.rerun()
     else:
         st.success("✅ 没有需要审核的项目")
 
