@@ -34,7 +34,8 @@ def page_workspace():
             c1,c2 = st.columns([4,1])
             with c1:
                 st.markdown(f"**{stage}**{paid} — **{p.get('brand_name','')}** | {p.get('project_code','')}")
-                st.caption(f"{p.get('currency','USD')} {p.get('amount',0):,.2f} | {p.get('client_short','')} | 负责人: {p.get('owner_name','') or '未指定'} | {(p.get('created_at','') or '')[:10]}")
+                owner = p.get('owner_name','') or '未指定'
+                st.caption(f"{p.get('currency','USD')} {p.get('amount',0):,.2f} | {p.get('client_short','')} | 👤 {owner} | {(p.get('created_at','') or '')[:10]}")
             with c2:
                 if st.button("📄 操作", key=f"go_{p['id']}", use_container_width=True):
                     st.session_state['edit_project_id'] = p['id']
