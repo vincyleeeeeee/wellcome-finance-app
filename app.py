@@ -685,7 +685,7 @@ def page_history():
                     info_parts.append(f"预计付款: {p['expected_payment_date']}")
                 st.caption(" | ".join(info_parts))
 
-            with col2:
+            with cc2:
                 if p.get('status') == 'approved' and p.get('stamped_pdf_path'):
                     stamped = p['stamped_pdf_path']
                     if os.path.exists(stamped):
