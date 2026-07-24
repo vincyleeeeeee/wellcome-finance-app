@@ -24,14 +24,14 @@ def page_generate():
     if edit_data:
         st.info(f"📌 项目：**{edit_data.get('brand_name','')}** ({edit_data.get('project_code','')})")
         # Stage labels above slider
-        all_labels = ['📝 信息','📄 确认函','📎 盖章','🧾 发票','💰 收据']
+        all_labels = ['📝 信息','📄 确认函','📎 客户盖章确认函','🧾 发票','💰 收据']
         st.caption("   ".join(all_labels))
         # Use session_state to persist slider value across reruns
         slider_key = f"stage_slider_{edit_id}"
         if slider_key not in st.session_state:
             st.session_state[slider_key] = stage_idx
 
-        all_labels = ['📝 信息','📄 确认函','📎 盖章','🧾 发票','💰 收据']
+        all_labels = ['📝 信息','📄 确认函','📎 客户盖章确认函','🧾 发票','💰 收据']
         st.caption("   ".join(all_labels))
         target = st.select_slider(
             "👇 拖动到当前需要操作的步骤",
@@ -58,7 +58,7 @@ def page_generate():
     else:
         st.info("填一次基本信息，后续各阶段按流程推进")
 
-    labels = ['📝 信息','📄 确认函','📎 盖章','🧾 发票','💰 收据']
+    labels = ['📝 信息','📄 确认函','📎 客户盖章确认函','🧾 发票','💰 收据']
     st.progress((stage_idx + 1) / len(labels), text=f"当前进度：{labels[stage_idx]}")
     st.caption(" → ".join(f"**{l}**" if i == stage_idx else l for i, l in enumerate(labels)))
     st.divider()
@@ -140,7 +140,7 @@ def _stage_invoice(edit_data, user):
     if not edit_data:
         st.warning("请先完成前面阶段"); return
     if not edit_data.get('stamped_confirmation'):
-        st.error("⚠️ 请先在「📎 盖章」阶段上传客户盖章确认函"); return
+        st.error("⚠️ 请先在「📎 客户盖章确认函」阶段上传"); return
     f_ok = st.checkbox("已在飞书立项", value=edit_data.get('feishu_approved',False))
     subm = st.checkbox("生成后提交财务审核", value=True)
     if st.button("🧾 生成发票并提交审核", type="primary", use_container_width=True):
