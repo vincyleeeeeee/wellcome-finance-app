@@ -49,7 +49,7 @@ def page_generate():
         st.info("填一次基本信息，后续各阶段按流程推进")
 
     labels = ['📝 信息','📄 确认函','📎 盖章','🧾 发票','💰 收据']
-    st.progress((stage_idx + 1) / len(labels))
+    st.progress((stage_idx + 1) / len(labels), text=f"当前进度：{labels[stage_idx]}")
     st.caption(" → ".join(f"**{l}**" if i == stage_idx else l for i, l in enumerate(labels)))
     st.divider()
 
@@ -130,10 +130,10 @@ def _stage_invoice(edit_data, user):
     if not edit_data:
         st.warning("请先完成前面阶段"); return
     if not edit_data.get('stamped_confirmation'):
-        st.error("⚠️ 请先上传客户盖章确认函"); return
+        st.warning("⚠️ 尚未上传客户盖章确认函，建议先在「📎 盖章」阶段上传")
     f_ok = st.checkbox("已在飞书立项", value=edit_data.get('feishu_approved',False))
     subm = st.checkbox("生成后提交财务审核", value=True)
-    if st.button("🧾 生成发票并提交", type="primary", use_container_width=True):
+    if st.button("🧾 生成发票并提交审核", type="primary", use_container_width=True):
         client = get_client_by_id(edit_data.get('client_id')) or {}
         inv_path = generate_invoice(client, {
             'client_short':edit_data.get('client_short',client.get('short_name','')),
@@ -151,7 +151,8 @@ def _stage_invoice(edit_data, user):
         }).eq("id",edit_data['id']).execute()
         with open(inv_path,'rb') as f:
             st.download_button("📥 下载Invoice", f, file_name=f"{edit_data.get('brand_name','')}-invoice.xlsx")
-        st.success("✅ 已提交！")
+        st.success("✅ 已生成！" if not subm else "✅ 已提交财务审核！")
+        st.rerun()
 
 
 def _stage_receipt(edit_data, user):
