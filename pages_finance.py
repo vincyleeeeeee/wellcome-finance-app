@@ -223,9 +223,11 @@ def page_approval():
                     reject_project(p['id'], user['id']); st.warning("已驳回"); st.rerun()
 
     # Recently approved projects with stamped PDF download
-    all_p = get_projects(limit=50)
+    all_p = get_projects(limit=100)
     approved = [p for p in all_p if p.get('status')=='approved']
-    if approved:
+    if not approved:
+        st.divider()
+        st.info("暂无已通过的项目。审核通过项目后将在此显示。")
         st.divider()
         st.subheader("✅ 已通过项目（可下载盖章PDF）")
         for p in approved[:10]:
