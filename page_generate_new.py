@@ -215,7 +215,7 @@ def _show_info_fields(edit_data, client_names, cmap, user):
             if st.checkbox(cat, key=f"nf_cb_{cat}"):
                 a = st.number_input("金额", key=f"nf_a_{cat}", value=None, step=100.0)
                 cu = st.selectbox("币种", ["RMB","USD","THB","MYR"], key=f"nf_c_{cat}")
-                if a>0: tr+=a*R.get(cu,1); items.append({"name":cat,"amount":a,"currency":cu})
+                if a and a>0: tr+=a*R.get(cu,1); items.append({"name":cat,"amount":a,"currency":cu})
     # Dynamic custom cost items
     if 'custom_cost_count' not in st.session_state:
         st.session_state['custom_cost_count'] = 1
