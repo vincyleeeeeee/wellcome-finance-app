@@ -223,35 +223,32 @@ def page_approval():
     else:
         st.success("✅ 没有需要审核的项目")
 
-    # Recently approved projects with stamped PDF download
+    # Approved projects with download
+    st.divider()
     all_p = get_projects(limit=100)
-    approved = [p for p in all_p if p.get('status')=='approved']
-    if not approved:
-        st.divider()
-        st.info("暂无已通过的项目。审核通过项目后将在此显示。")
-        st.divider()
-        st.subheader("✅ 已通过项目（可下载盖章PDF）")
-        for p in approved[:10]:
+    approved_list = [p for p in all_p if p.get('status')=='approved']
+    if approved_list:
+        st.subheader(f"✅ 已通过项目（{len(approved_list)}个，可下载盖章PDF）")
+        for p in approved_list[:20]:
             col1, col2 = st.columns([3,1])
             with col1:
-                st.write(f"**{p.get('brand_name','')}** — {p.get('project_code','')} — {(p.get('approved_at','') or '')[:10]}")
+                st.write(f"**{p.get('brand_name','')}** — {p.get('project_code','')}")
             with col2:
                 try:
                     import tempfile
                     stamped_path = tempfile.mktemp(suffix='.pdf')
                     _gen_stamped_only(p, stamped_path)
-                    # Figure out month from project code: WELL2607xx → 7月
                     code = p.get('project_code','')
-                    month_str = code[4:6] if len(code)>=6 else ''
-                    month_name = f"{int(month_str)}月" if month_str.isdigit() else month_str
+                    month_str = code[4:6] if len(code)>=8 else ''
+                    month_name = f"{int(month_str)}月" if month_str.isdigit() else ''
                     fname = f"{p.get('brand_name','')}-{month_name}-invoice.pdf"
                     with open(stamped_path, 'rb') as f:
                         st.download_button("📥 盖章PDF", f, file_name=fname,
                                           key=f"stamped_{p['id']}", use_container_width=True)
-                    try: os.unlink(stamped_path)
-                    except: pass
-                except Exception as e:
-                    st.caption(f"生成失败")
+                except:
+                    st.caption("重新生成失败")
+    else:
+        st.info("暂无已通过的项目")
 
 
 def _gen_invoice_dl(p):
