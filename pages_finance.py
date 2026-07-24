@@ -16,6 +16,13 @@ STAGE_MAP = {'draft': '草稿', 'pending': '待审核', 'approved': '已开发�
 CLOSURE_MAP = {'active': '进行中', 'pending_payment': '待收款', 'closed': '已结案'}
 
 
+def _fmt_date_val(val):
+    """Consistent YYYY-MM-DD format."""
+    if val is None: return ''
+    if hasattr(val, 'strftime'): return val.strftime('%Y-%m-%d')
+    return str(val)[:10]
+
+
 def _fmt_cost_line(cost_json: str) -> str:
     if not cost_json: return ""
     try:
@@ -198,7 +205,8 @@ def _gen_invoice_dl(p):
         ws['C7']=client.get('full_name',''); ws['C9']=client.get('contact','')
         ws['E8']=p.get('project_code',''); ws['E11']=p.get('project_code','')
         ws['D15']=p.get('amount',0); ws['E15']=1; ws['G15']=p.get('amount',0)
-        ws['E10']=str(p.get('due_date',''))[:10]
+        ws['E9']=_fmt_date_val(p.get('invoice_date'))
+        ws['E10']=_fmt_date_val(p.get('due_date'))
         _write_c18(ws, p.get('amount',0), p.get('currency','USD'))
         buf=io.BytesIO(); wb.save(buf); buf.seek(0)
         st.download_button("📥 下载Invoice", buf, file_name=f"{p.get('brand_name','')}-invoice.xlsx",
@@ -227,7 +235,8 @@ def _regen_and_approve(p, user_id):
     ws['C9']=client.get('contact','')
     ws['C10']=client.get('phone') if client.get('phone') and client['phone']!='（待补充）' else None
     ws['C11']=client.get('email') if client.get('email') and client['email']!='（待补充）' else None
-    ws['E8']=p.get('project_code',''); ws['E10']=str(p.get('due_date',''))[:10]
+    ws['E8']=p.get('project_code',''); ws['E9']=_fmt_date_val(p.get('invoice_date'))
+    ws['E10']=_fmt_date_val(p.get('due_date'))
     ws['E11']=p.get('project_code',''); ws['D15']=p.get('amount',0)
     ws['E15']=1; ws['G15']=p.get('amount',0)
     _write_c18(ws, p.get('amount',0), p.get('currency','USD'))

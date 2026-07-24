@@ -287,8 +287,8 @@ def generate_cash_receipt(client: dict, receipt_data: dict) -> str:
     ws['E4'] = ISSUER['phone']
     ws['E5'] = ISSUER['address']
     ws['E8'] = receipt_data.get('project_code', '')
-    ws['E9'] = receipt_data.get('payment_date', datetime.datetime.now())
-    ws['E10'] = receipt_data.get('gained_date', datetime.datetime.now())
+    ws['E9'] = _fmt_date(receipt_data.get('payment_date'))
+    ws['E10'] = _fmt_date(receipt_data.get('gained_date'))
     ws['E11'] = receipt_data.get('payment_method', 'BANK')
 
     # Body text
