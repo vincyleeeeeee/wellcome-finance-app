@@ -272,7 +272,7 @@ def page_approval():
                     stamped_path = tempfile.mktemp(suffix='.pdf')
                     _gen_stamped_only(p, stamped_path)
                     code = p.get('project_code','')
-                    month_str = code[4:6] if len(code)>=8 else ''
+                    month_str = code[6:8] if len(code)>=8 else ''
                     month_name = f"{int(month_str)}月" if month_str.isdigit() else ''
                     fname = f"{p.get('brand_name','')}-{month_name}-invoice.pdf"
                     with open(stamped_path, 'rb') as f:
