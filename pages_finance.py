@@ -212,6 +212,29 @@ def page_approval():
                 if st.button("❌ 驳回", key=f"no_{p['id']}", use_container_width=True):
                     reject_project(p['id'], user['id']); st.warning("已驳回"); st.rerun()
 
+    # Recently approved projects with stamped PDF download
+    all_p = get_projects(limit=50)
+    approved = [p for p in all_p if p.get('status')=='approved' and p.get('stamped_pdf_path')]
+    if approved:
+        st.divider()
+        st.subheader("✅ 已通过项目（盖章PDF可下载）")
+        for p in approved[:10]:
+            col1, col2 = st.columns([3,1])
+            with col1:
+                st.write(f"**{p.get('brand_name','')}** — {p.get('project_code','')} — {(p.get('approved_at','') or '')[:10]}")
+            with col2:
+                try:
+                    _regen_and_approve(p, None)  # regenerate stamped PDF
+                    # The stamped path was updated in DB, but we need to serve it
+                    # Actually just regenerate and download
+                    import tempfile
+                    stamped_path = tempfile.mktemp(suffix='.pdf')
+                    _gen_stamped_only(p, stamped_path)
+                    with open(stamped_path, 'rb') as f:
+                        st.download_button("📥 盖章PDF", f, file_name=f"{p.get('brand_name','')}-stamped-invoice.pdf",
+                                          key=f"stamped_{p['id']}", use_container_width=True)
+                except: pass
+
 
 def _gen_invoice_dl(p):
     """Generate invoice download button for approval preview."""
@@ -241,6 +264,25 @@ def _write_c18(ws, amount, currency):
     cl = "RMB" if currency=="RMB" else "USD"
     cn = _amount_chinese(amount, currency)
     ws['C18'] = f"總付款金額為{cn}\nFull payment of {cl} {amount:,.2f}"
+
+
+def _gen_stamped_only(p, output_path):
+    """Generate stamped PDF without approving (for re-download)."""
+    import openpyxl as xl
+    from utils.pdf_utils import generate_stamped_pdf
+    from utils.generate import TEMPLATE_DIR as TD
+    client=get_client_by_id(p.get('client_id')) or {}
+    wb=xl.load_workbook(os.path.join(TD,"Invoice-Template.xlsx")); ws=wb.active
+    ws['C3']=f"{p.get('brand_name','')} – {p.get('total_posts','')} CONTENT PACKAGE"
+    ws['C7']=client.get('full_name',''); ws['E8']=p.get('project_code','')
+    ws['E9']=_fmt_date_val(p.get('invoice_date')); ws['E10']=_fmt_date_val(p.get('due_date'))
+    ws['E11']=p.get('project_code',''); ws['D15']=p.get('amount',0); ws['E15']=1; ws['G15']=p.get('amount',0)
+    _write_c18(ws, p.get('amount',0), p.get('currency','USD'))
+    buf=io.BytesIO(); wb.save(buf); buf.seek(0)
+    with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f: f.write(buf.read()); xlsx_path=f.name
+    generate_stamped_pdf(xlsx_path, output_path)
+    try: os.unlink(xlsx_path)
+    except: pass
 
 
 def _regen_and_approve(p, user_id):

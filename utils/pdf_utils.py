@@ -51,11 +51,11 @@ def generate_stamped_pdf(xlsx_path: str, output_path: str, stamp_path: str = Non
 
         # Insert stamp image near bottom-right (row ~30, column E-F)
         img = openpyxl.drawing.image.Image(stamp_path)
-        # 150% enlarged: target width ~250px
-        img.width = 250
-        img.height = int(250 * sh / sw)
-        # Position at bottom-right (around row 30-33)
-        img.anchor = 'E30'
+        # Enlarged: target width ~350px for visibility
+        img.width = 350
+        img.height = int(350 * sh / sw)
+        # Position OVER the Wellcome company name area (row 33)
+        img.anchor = 'D32'
         ws.add_image(img)
 
     # Save modified xlsx
