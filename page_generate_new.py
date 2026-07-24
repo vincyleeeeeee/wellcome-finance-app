@@ -51,8 +51,11 @@ def _quick_create(client_names, cmap, user):
         col1, col2 = st.columns(2)
         with col1:
             sel = st.selectbox("客户简称", client_names, key="qc_sel")
-            code = get_next_code_for_month(datetime.now().year, datetime.now().month)
+            qc_month = st.selectbox("编号月份", list(range(1,13)), index=datetime.now().month-1,
+                                    format_func=lambda m:f"{m}月", key="qc_month")
+            code = get_next_code_for_month(datetime.now().year, qc_month)
             st.text_input("项目编号", value=code, key="qc_code")
+            st.caption("💡 自动生成，可直接修改")
             st.text_input("项目名称 *", key="qc_name")
             st.text_input("品牌名 *", key="qc_brand")
         with col2:
