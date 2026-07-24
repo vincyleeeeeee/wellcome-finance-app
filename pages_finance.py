@@ -331,7 +331,7 @@ def page_approval():
         with col_dl:
             if os.path.exists(ja['path']):
                 with open(ja['path'], "rb") as f:
-                    st.download_button("📥 下载盖章PDF", f, file_name=ja['name'],
+                    st.download_button("📥 下载盖章发票PDF", f, file_name=ja['name'],
                                       key="dl_ja", use_container_width=True)
         with col_email:
             with st.expander("📧 邮件文案（发送给客户）", expanded=True):
@@ -361,7 +361,7 @@ def page_approval():
                     month_name = MONTH_NAMES.get(month_str, '')
                     fname = f"{p.get('brand_name','')}-{month_name}-invoice.pdf"
                     with open(stamped_path, 'rb') as f:
-                        st.download_button("📥 盖章PDF", f, file_name=fname,
+                        st.download_button("📥 盖章发票PDF", f, file_name=fname,
                                           key=f"stamped_{p['id']}", use_container_width=True)
                 except:
                     st.caption("重新生成失败")
