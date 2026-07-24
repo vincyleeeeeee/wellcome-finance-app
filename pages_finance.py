@@ -66,6 +66,11 @@ def _render_table(projects):
         closure = CLOSURE_MAP.get(p.get('closure_status', 'active'), '')
         paid = '✅' if p.get('payment_received') else ''
         feishu = '✅' if p.get('feishu_approved') else ''
+        total_cost = p.get('estimated_cost',0) or 0
+        # Extract year-month from project code: WELL260701xxx → 2026-07
+        code = p.get('project_code','')
+        ym = code[2:6] if len(code)>=6 else ''
+        year_month = f"20{ym[:2]}-{ym[2:]}" if len(ym)==4 else ''
 
         try: cost_items = json.loads(p.get('cost_breakdown','') or '[]')
         except: cost_items = []
@@ -76,12 +81,15 @@ def _render_table(projects):
                 rows_html += "<tr>"
                 if idx == 0:
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{stage}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('project_code','')}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{year_month}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{code}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('brand_name','')}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('client_short','')}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
                 rows_html += f"<td>{item.get('name','')}</td>"
                 rows_html += f"<td style='text-align:right'>{item.get('currency','RMB')} {item.get('amount',0):,.0f}</td>"
+                if idx == 0:
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>RMB {total_cost:,.0f}</td>"
                 rows_html += f"<td style='text-align:center'>{feishu}</td>"
                 if idx == 0:
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{paid}</td>"
@@ -90,11 +98,13 @@ def _render_table(projects):
         else:
             rows_html += "<tr>"
             rows_html += f"<td style='text-align:center'>{stage}</td>"
-            rows_html += f"<td style='text-align:center'>{p.get('project_code','')}</td>"
+            rows_html += f"<td style='text-align:center'>{year_month}</td>"
+            rows_html += f"<td style='text-align:center'>{code}</td>"
             rows_html += f"<td style='text-align:center'>{p.get('brand_name','')}</td>"
             rows_html += f"<td style='text-align:center'>{p.get('client_short','')}</td>"
             rows_html += f"<td style='text-align:center'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
-            rows_html += f"<td></td><td style='text-align:right'>RMB {p.get('estimated_cost',0):,.0f}</td>"
+            rows_html += f"<td></td><td style='text-align:right'>RMB {total_cost:,.0f}</td>"
+            rows_html += f"<td style='text-align:center'>RMB {total_cost:,.0f}</td>"
             rows_html += f"<td style='text-align:center'>{feishu}</td>"
             rows_html += f"<td style='text-align:center'>{paid}</td>"
             rows_html += f"<td style='text-align:center'>{closure}</td>"
@@ -108,8 +118,8 @@ def _render_table(projects):
     tr:nth-child(even) {{ background: #fafafa; }}
     </style>
     <table>
-    <tr><th>阶段</th><th>编号</th><th>品牌</th><th>客户</th><th>金额</th>
-    <th>成本细项</th><th>成本金额</th><th>飞书</th><th>到账</th><th>结案</th></tr>
+    <tr><th>阶段</th><th>年月</th><th>编号</th><th>品牌</th><th>客户</th><th>金额</th>
+    <th>成本细项</th><th>成本金额</th><th>总成本</th><th>飞书</th><th>到账</th><th>结案</th></tr>
     {rows_html}
     </table>
     """
