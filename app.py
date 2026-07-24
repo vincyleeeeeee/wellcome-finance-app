@@ -629,15 +629,53 @@ def page_history():
     status_map = {'draft': '草稿', 'pending': '待审核', 'approved': '✅ 已通过', 'rejected': '❌ 已驳回'}
     closure_map = {'active': '🟢 进行中', 'pending_payment': '🟡 待付款', 'closed': '🔵 已结案'}
 
+    # Track selections
+    if '_selected_projects' not in st.session_state:
+        st.session_state['_selected_projects'] = set()
+
+    # Batch action buttons
+    sel_count = len(st.session_state['_selected_projects'])
+    if sel_count > 0:
+        st.info(f"已选择 {sel_count} 个项目")
+        bc1, bc2, bc3 = st.columns(3)
+        with bc1:
+            if st.button("📤 批量提交审核", use_container_width=True):
+                for pid in list(st.session_state['_selected_projects']):
+                    submit_for_approval(pid)
+                st.session_state['_selected_projects'] = set()
+                st.success(f"已提交 {sel_count} 个项目")
+                st.rerun()
+        with bc2:
+            if st.button("🗑️ 批量删除", use_container_width=True):
+                for pid in list(st.session_state['_selected_projects']):
+                    from utils.database import get_connection as _gc
+                    _gc().table("projects").delete().eq("id", pid).execute()
+                st.session_state['_selected_projects'] = set()
+                st.success(f"已删除 {sel_count} 个项目")
+                st.rerun()
+        with bc3:
+            if st.button("❌ 清除选择", use_container_width=True):
+                st.session_state['_selected_projects'] = set()
+                st.rerun()
+
     for p in projects:
         status_label = status_map.get(p.get('status'), p.get('status', '?'))
         closure = p.get('closure_status', 'active') or 'active'
         closure_label = closure_map.get(closure, closure)
 
         with st.container(border=True):
-            # Row 1: basic info
-            col1, col2 = st.columns([3, 1])
-            with col1:
+            # Checkbox + basic info
+            cc0, cc1, cc2 = st.columns([0.5, 3, 1])
+            pid = p['id']
+            sel_key = f"sel_{pid}"
+            with cc0:
+                selected = st.checkbox("", key=sel_key, label_visibility="collapsed",
+                                       value=pid in st.session_state['_selected_projects'])
+                if selected:
+                    st.session_state['_selected_projects'].add(pid)
+                else:
+                    st.session_state['_selected_projects'].discard(pid)
+            with cc1:
                 st.write(f"{status_label} {closure_label} **{p.get('brand_name','?')}** — {p.get('project_code','?')}")
                 info_parts = [f"金额: {p.get('currency','USD')} {p.get('amount',0):,.2f}"]
                 if p.get('estimated_cost'):

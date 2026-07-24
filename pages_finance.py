@@ -36,17 +36,32 @@ def page_overview():
     projects = get_projects(limit=500)
     if not projects: st.info("暂无项目"); return
 
+    # Year-month filter
+    months = sorted(set(
+        f"20{p.get('project_code','')[4:6]}-{p.get('project_code','')[6:8]}"
+        for p in projects if len(p.get('project_code','')) >= 8
+    ), reverse=True)
+    months = ['全部'] + months
+    sel_month = st.selectbox("筛选年月", months)
+    if sel_month != '全部':
+        projects = [p for p in projects
+                    if f"20{p.get('project_code','')[4:6]}-{p.get('project_code','')[6:8]}" == sel_month
+                    and len(p.get('project_code','')) >= 8]
+
+    # Summary cards
     pending_count = sum(1 for p in projects if p.get('status') == 'pending')
     approved_count = sum(1 for p in projects if p.get('status') == 'approved')
     received_count = sum(1 for p in projects if p.get('payment_received'))
     closed_count = sum(1 for p in projects if p.get('closure_status') == 'closed')
     total_cost = sum(p.get('estimated_cost',0) or 0 for p in projects)
-    c1,c2,c3,c4,c5 = st.columns(5)
+    total_revenue = sum(p.get('amount',0) or 0 for p in projects)
+    c1,c2,c3,c4,c5,c6 = st.columns(6)
     c1.metric("⏳ 待审核", pending_count)
     c2.metric("✅ 已开发票", approved_count)
     c3.metric("💰 已到账", received_count)
     c4.metric("🔒 已结案", closed_count)
-    c5.metric("💸 总成本(RMB)", f"¥{total_cost:,.0f}")
+    c5.metric("💸 总成本", f"¥{total_cost:,.0f}")
+    c6.metric("📈 总收入", f"${total_revenue:,.0f}")
     st.divider()
 
     # === Excel download ===
