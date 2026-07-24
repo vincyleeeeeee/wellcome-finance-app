@@ -400,10 +400,10 @@ def _client_form(client: "dict | None"):
                 st.error(msg)
 
 
-# ============================================================
-# Document Generation
-# ============================================================
-def page_generate():
+# page_generate imported from page_generate_new.py
+
+
+def _page_generate_placeholder():
     st.title("📄 生成文档")
     user = st.session_state.user
 
