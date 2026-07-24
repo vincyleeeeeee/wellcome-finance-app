@@ -380,7 +380,9 @@ def _gen_invoice_dl(p):
         if not client: return
         wb=xl.load_workbook(os.path.join(TD,"Invoice-Template.xlsx")); ws=wb.active
         ws['C3']=f"{p.get('brand_name','')} – {p.get('total_posts','')} CONTENT PACKAGE"
-        ws['C7']=client.get('full_name',''); ws['C9']=client.get('contact','')
+        ws['C7']=client.get('full_name',''); ws['C8']=client.get('address','')
+        ws['C9']=client.get('contact',''); ws['C10']=client.get('phone') or ''
+        ws['C11']=client.get('email') or ''
         ws['E8']=p.get('project_code',''); ws['E11']=p.get('project_code','')
         ws['D15']=p.get('amount',0); ws['E15']=1; ws['G15']=p.get('amount',0)
         ws['E9']=_fmt_date_val(p.get('invoice_date'))
@@ -409,7 +411,9 @@ def _gen_stamped_only(p, output_path):
     client=get_client_by_id(p.get('client_id')) or {}
     wb=xl.load_workbook(os.path.join(TD,"Invoice-Template.xlsx")); ws=wb.active
     ws['C3']=f"{p.get('brand_name','')} – {p.get('total_posts','')} CONTENT PACKAGE"
-    ws['C7']=client.get('full_name',''); ws['E8']=p.get('project_code','')
+    ws['C7']=client.get('full_name',''); ws['C8']=client.get('address','')
+    ws['C9']=client.get('contact',''); ws['C10']=client.get('phone') or ''
+    ws['C11']=client.get('email') or ''; ws['E8']=p.get('project_code','')
     ws['E9']=_fmt_date_val(p.get('invoice_date')); ws['E10']=_fmt_date_val(p.get('due_date'))
     ws['E11']=p.get('project_code',''); ws['D15']=p.get('amount',0); ws['E15']=1; ws['G15']=p.get('amount',0)
     _write_c18(ws, p.get('amount',0), p.get('currency','USD'))
