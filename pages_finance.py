@@ -71,13 +71,30 @@ def page_overview():
     closed_count = sum(1 for p in projects if p.get('closure_status') == 'closed')
     total_cost = sum(p.get('estimated_cost',0) or 0 for p in projects)
     total_revenue = sum(p.get('amount',0) or 0 for p in projects)
-    c1,c2,c3,c4,c5,c6 = st.columns(6)
+    need_receipt = sum(1 for p in projects if p.get('payment_received') and p.get('status')=='approved')
+    c1,c2,c3,c4,c5,c6,c7 = st.columns(7)
     c1.metric("⏳ 待审核", pending_count)
     c2.metric("✅ 已开发票", approved_count)
     c3.metric("💰 已到账", received_count)
-    c4.metric("🔒 已结案", closed_count)
-    c5.metric("💸 总成本", f"¥{total_cost:,.0f}")
-    c6.metric("📈 总收入", f"${total_revenue:,.0f}")
+    c4.metric("🧾 待开收据", need_receipt)
+    c5.metric("🔒 已结案", closed_count)
+    c6.metric("💸 总成本", f"¥{total_cost:,.0f}")
+    c7.metric("📈 总收入", f"${total_revenue:,.0f}")
+
+    # Quick action: projects needing receipt
+    need_rec_projects = [p for p in projects if p.get('payment_received') and p.get('status')=='approved']
+    if need_rec_projects:
+        st.divider()
+        st.subheader("🧾 待开收据项目")
+        for p in need_rec_projects[:5]:
+            c1,c2 = st.columns([4,1])
+            with c1:
+                st.write(f"**{p.get('brand_name','')}** — {p.get('project_code','')} | {p.get('currency','USD')} {p.get('amount',0):,.0f}")
+            with c2:
+                if st.button("🧾 开收据", key=f"rec_{p['id']}", use_container_width=True):
+                    st.session_state['receipt_project_id'] = p['id']
+                    st.session_state.page = "receipt"
+                    st.rerun()
     st.divider()
 
     # === Excel download ===
