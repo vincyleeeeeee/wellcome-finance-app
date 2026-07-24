@@ -47,6 +47,30 @@ st.set_page_config(
 )
 
 # ============================================================
+# Custom CSS for sidebar highlighting
+# ============================================================
+st.markdown("""
+<style>
+/* Active sidebar button - make it visibly highlighted */
+div[data-testid="stSidebar"] button[kind="primary"] {
+    background-color: #1a73e8 !important;
+    color: white !important;
+    border: 2px solid #1557b0 !important;
+    font-weight: bold !important;
+}
+/* Inactive sidebar buttons */
+div[data-testid="stSidebar"] button[kind="secondary"] {
+    background-color: transparent !important;
+    color: #555 !important;
+}
+/* Finance section header */
+div[data-testid="stSidebar"] .stMarkdown {
+    margin-top: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================
 # Init DB
 # ============================================================
 init_db()
