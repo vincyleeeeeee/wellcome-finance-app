@@ -115,10 +115,15 @@ def _render_table(projects):
         paid = '✅' if p.get('payment_received') else ''
         feishu = '是' if p.get('feishu_approved') else '否'
         total_cost = p.get('estimated_cost',0) or 0
-        # Extract year-month from project code: WELL260701xxx → 2026-07
+        # Extract year-month: handle both formats
+        # WELL260801001 (13 chars) or WELL20260717012 (15 chars)
         code = p.get('project_code','')
-        # WELL260701001 → 2026-07
-        year_month = f"20{code[4:6]}-{code[6:8]}" if len(code)>=8 else ''
+        if len(code) >= 15:  # old format WELL20260717012
+            year_month = f"{code[4:8]}-{code[8:10]}"
+        elif len(code) >= 8:  # new format WELL260801001
+            year_month = f"20{code[4:6]}-{code[6:8]}"
+        else:
+            year_month = ''
 
         try: cost_items = json.loads(p.get('cost_breakdown','') or '[]')
         except: cost_items = []
@@ -160,31 +165,18 @@ def _render_table(projects):
 
     html = f"""
     <style>
-    table {{ border-collapse: collapse; width: 100%; font-size: 13px; }}
-    th, td {{ border: 1px solid #ddd; padding: 6px 8px; }}
-    th {{ background: #f5f5f5; text-align: center; }}
+    table {{ border-collapse: collapse; width: 100%; font-size: 14px; font-family: -apple-system, sans-serif; }}
+    th, td {{ border: 1px solid #ddd; padding: 8px 8px; font-size: 14px; }}
+    th {{ background: #f5f5f5; text-align: center; font-size: 14px; }}
     tr:nth-child(even) {{ background: #fafafa; }}
     </style>
     <table>
     <tr><th>阶段</th><th>年月</th><th>编号</th><th>品牌</th><th>客户</th><th>金额</th>
-    <th>成本细项</th><th>成本金额</th><th>总成本</th><th>是否立项</th><th>到账</th><th>结案</th></tr>
+    <th>成本细项</th><th>成本金额</th><th>总成本</th><th>立项</th><th>到账</th><th>结案</th></tr>
     {rows_html}
     </table>
     """
     st.markdown(html, unsafe_allow_html=True)
-
-    # Quick actions
-    for p in projects:
-        if p.get('status') == 'approved' and not p.get('payment_received'):
-            col_a, col_b = st.columns([4, 1])
-            with col_b:
-                if st.button(f"💰 标记到账", key=f"paid_{p['id']}"):
-                    from utils.database import get_connection
-                    get_connection().table("projects").update({
-                        "payment_received": True,
-                        "received_date": datetime.now().strftime('%Y-%m-%d'),
-                    }).eq("id", p['id']).execute()
-                    st.rerun()
 
 
 def _export_excel(projects):
