@@ -69,8 +69,8 @@ def _render_table(projects):
         total_cost = p.get('estimated_cost',0) or 0
         # Extract year-month from project code: WELL260701xxx → 2026-07
         code = p.get('project_code','')
-        ym = code[2:6] if len(code)>=6 else ''
-        year_month = f"20{ym[:2]}-{ym[2:]}" if len(ym)==4 else ''
+        # WELL260701001 → 2026-07
+        year_month = f"20{code[4:6]}-{code[6:8]}" if len(code)>=8 else ''
 
         try: cost_items = json.loads(p.get('cost_breakdown','') or '[]')
         except: cost_items = []
