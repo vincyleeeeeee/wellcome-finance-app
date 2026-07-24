@@ -785,7 +785,11 @@ def page_history():
                     stamped = p['stamped_pdf_path']
                     if os.path.exists(stamped):
                         with open(stamped, "rb") as f:
-                            st.download_button("📥 盖章PDF", f, file_name=os.path.basename(stamped),
+                            code_p = p.get('project_code','')
+                            ms = code_p[6:8] if len(code_p)>=8 else ''
+                            M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
+                            fname = f"{p.get('brand_name','')}-{M.get(ms,'')}-invoice.pdf"
+                            st.download_button("📥 盖章PDF", f, file_name=fname,
                                              key=f"hist_stamped_{p['id']}", use_container_width=True)
                 elif p.get('status') in ('draft', 'rejected') and user['id'] == p.get('created_by'):
                     if st.button("📤 提交审核", key=f"submit_hist_{p['id']}", use_container_width=True):
