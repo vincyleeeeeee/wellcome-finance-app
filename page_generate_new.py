@@ -140,7 +140,7 @@ def _show_info(edit_data, client_names, cmap, user):
     for i, cat in enumerate(["拍摄","餐饮交通","发布","补发"]):
         with ccols[i]:
             if st.checkbox(cat, key=f"ei_cb_{cat}"):
-                a = st.number_input("金额", key=f"ei_a_{cat}", value=None, step=100.0)
+                a = st.number_input("金额", key=f"ei_a_{cat}", step=100.0)
                 cu = st.selectbox("币种", ["RMB","USD","THB","MYR"], key=f"ei_c_{cat}")
                 if a and a>0: tr+=a*R.get(cu,1); items.append({"name":cat,"amount":a,"currency":cu})
 
@@ -148,7 +148,7 @@ def _show_info(edit_data, client_names, cmap, user):
     for i in range(st.session_state['ei_custom_n']):
         c1,c2,c3=st.columns([2,2,1])
         with c1: cn=st.text_input(f"分类#{i+1}", key=f"ei_cn{i}")
-        with c2: ca=st.number_input("金额", key=f"ei_ca{i}", value=None, step=100.0)
+        with c2: ca=st.number_input("金额", key=f"ei_ca{i}", step=100.0)
         with c3: cc=st.selectbox("币种",["RMB","USD","THB","MYR"], key=f"ei_cc{i}")
         if cn and ca and ca>0: tr+=ca*R.get(cc,1); items.append({"name":cn,"amount":ca,"currency":cc})
     if st.button("➕ 添加分类"):
