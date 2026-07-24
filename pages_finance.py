@@ -40,11 +40,13 @@ def page_overview():
     approved_count = sum(1 for p in projects if p.get('status') == 'approved')
     received_count = sum(1 for p in projects if p.get('payment_received'))
     closed_count = sum(1 for p in projects if p.get('closure_status') == 'closed')
-    c1,c2,c3,c4 = st.columns(4)
+    total_cost = sum(p.get('estimated_cost',0) or 0 for p in projects)
+    c1,c2,c3,c4,c5 = st.columns(5)
     c1.metric("⏳ 待审核", pending_count)
     c2.metric("✅ 已开发票", approved_count)
     c3.metric("💰 已到账", received_count)
     c4.metric("🔒 已结案", closed_count)
+    c5.metric("💸 总成本(RMB)", f"¥{total_cost:,.0f}")
     st.divider()
 
     # === Excel download ===
@@ -129,11 +131,13 @@ def _render_table(projects):
 
 def _export_excel(projects):
     import openpyxl as xl
-    from openpyxl.styles import Font, Alignment
+    from openpyxl.styles import Font, Alignment, Border, Side, BorderSide
     wb = xl.Workbook(); ws = wb.active; ws.title = "成本明细"
     hs = ['项目编号','品牌','客户','阶段','金额','成本细项','成本金额','币种','到账','结案']
+    thin = Side(style='thin')
     for c,h in enumerate(hs,1):
-        cell=ws.cell(1,c,h); cell.font=Font(bold=True); cell.alignment=Alignment(horizontal='center')
+        cell=ws.cell(1,c,h); cell.font=Font(bold=True); cell.alignment=Alignment(horizontal='center',vertical='center')
+        cell.border=Border(bottom=thin)
     row=2
     for p in projects:
         stage=STAGE_MAP.get(p.get('status',''),'')
@@ -141,21 +145,37 @@ def _export_excel(projects):
         paid='是' if p.get('payment_received') else '否'
         try: items=json.loads(p.get('cost_breakdown','') or '[]')
         except: items=[]
+        start_row = row
         if items:
             for it in items:
-                ws.cell(row,1,p.get('project_code','')); ws.cell(row,2,p.get('brand_name',''))
-                ws.cell(row,3,p.get('client_short','')); ws.cell(row,4,stage)
-                ws.cell(row,5,f"{p.get('currency','USD')} {p.get('amount',0):,.0f}")
                 ws.cell(row,6,it.get('name','')); ws.cell(row,7,it.get('amount',0))
-                ws.cell(row,8,it.get('currency','RMB')); ws.cell(row,9,paid); ws.cell(row,10,closure)
+                ws.cell(row,8,it.get('currency','RMB'))
                 row+=1
         else:
-            ws.cell(row,1,p.get('project_code','')); ws.cell(row,2,p.get('brand_name',''))
-            ws.cell(row,3,p.get('client_short','')); ws.cell(row,4,stage)
-            ws.cell(row,5,f"{p.get('currency','USD')} {p.get('amount',0):,.0f}")
             ws.cell(row,7,p.get('estimated_cost',0)); ws.cell(row,8,'RMB')
-            ws.cell(row,9,paid); ws.cell(row,10,closure)
             row+=1
+        end_row = row - 1
+
+        # Write merged project info and merge cells if multiple rows
+        ws.cell(start_row,1,p.get('project_code','')); ws.cell(start_row,2,p.get('brand_name',''))
+        ws.cell(start_row,3,p.get('client_short','')); ws.cell(start_row,4,stage)
+        ws.cell(start_row,5,f"{p.get('currency','USD')} {p.get('amount',0):,.0f}")
+        ws.cell(start_row,9,paid); ws.cell(start_row,10,closure)
+
+        # Center everything
+        for c in range(1,11):
+            ws.cell(start_row,c).alignment=Alignment(horizontal='center',vertical='center')
+
+        # Merge cells if project has multiple cost rows
+        if end_row > start_row:
+            for c in [1,2,3,4,5,9,10]:  # columns to merge
+                ws.merge_cells(start_row=start_row, start_column=c, end_row=end_row, end_column=c)
+
+        # Borders
+        for r in range(start_row, end_row+1):
+            for c in range(1,11):
+                ws.cell(r,c).border=Border(bottom=BorderSide(style='hair'))
+
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
     st.download_button("📥 下载 Excel", buf, file_name="项目成本明细.xlsx",
                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
