@@ -26,6 +26,7 @@ from utils.pdf_utils import generate_stamped_pdf
 from utils.receipt_pdf import generate_receipt_pdf
 from pages_finance import page_overview, page_approval
 from pages_workspace import page_workspace
+from page_generate_new import page_generate
 
 
 def _fmt_cost(cost_json: str) -> str:
@@ -403,9 +404,19 @@ def _client_form(client: "dict | None"):
 # Document Generation
 # ============================================================
 def page_generate():
-    st.title("📄 生成确认函 & Invoice")
+    st.title("📄 生成文档")
+    user = st.session_state.user
 
-    # Check if editing a rejected project
+    # === Progress stages ===
+    STAGES_LIST = [
+        ('info', '📝 填写信息', '填写项目基本信息'),
+        ('confirmation', '📄 确认函', '生成并发送确认函给客户'),
+        ('stamped', '📎 盖章回传', '客户盖章确认函上传'),
+        ('invoice', '🧾 开发票', '提交财务审核，生成盖章发票'),
+        ('receipt', '💰 开收据', '客户付款后开收据'),
+    ]
+
+    # Check if editing/selecting from workspace
     edit_id = st.session_state.get('edit_project_id')
     edit_data = None
     if edit_id:
