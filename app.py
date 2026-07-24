@@ -492,6 +492,7 @@ def page_generate():
         only_confirmation = st.checkbox("只要确认函（不生成 Invoice）", value=False)
         feishu_approved = st.checkbox("已在飞书立项（财务审核通过前提）", value=False,
                                      help="勾选后需上传飞书审批截图")
+        submit_approval = st.checkbox("生成后提交财务审核", value=not feishu_approved)
         feishu_screenshot = None
         if feishu_approved or submit_approval:
             feishu_screenshot = st.file_uploader(
@@ -499,7 +500,6 @@ def page_generate():
                 accept_multiple_files=False,
                 help="支持拖拽、点击上传、粘贴截图"
             )
-        submit_approval = st.checkbox("生成后提交财务审核", value=not feishu_approved)
         expected_payment_date = st.date_input("预计客户到账时间", value=None,
                                               help="客户的预计付款日期，用于财务跟踪")
         # === Cost breakdown with individual amounts ===
