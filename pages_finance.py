@@ -115,6 +115,8 @@ def _render_table(projects):
         paid = '✅' if p.get('payment_received') else ''
         feishu = '是' if p.get('feishu_approved') else '否'
         total_cost = p.get('estimated_cost',0) or 0
+        exec_period = p.get('execution_period','') or ''
+        exp_pay = str(p.get('expected_payment_date','') or '')[:10]
         # Extract year-month: handle both formats
         # WELL260801001 (13 chars) or WELL20260717012 (15 chars)
         code = p.get('project_code','')
@@ -139,6 +141,8 @@ def _render_table(projects):
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('brand_name','')}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('client_short','')}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{exec_period}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{exp_pay}</td>"
                 rows_html += f"<td>{item.get('name','')}</td>"
                 rows_html += f"<td style='text-align:right'>{item.get('currency','RMB')} {item.get('amount',0):,.0f}</td>"
                 if idx == 0:
@@ -156,6 +160,8 @@ def _render_table(projects):
             rows_html += f"<td style='text-align:center'>{p.get('brand_name','')}</td>"
             rows_html += f"<td style='text-align:center'>{p.get('client_short','')}</td>"
             rows_html += f"<td style='text-align:center'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
+            rows_html += f"<td style='text-align:center'>{exec_period}</td>"
+            rows_html += f"<td style='text-align:center'>{exp_pay}</td>"
             rows_html += f"<td></td><td style='text-align:right'>RMB {total_cost:,.0f}</td>"
             rows_html += f"<td style='text-align:center'>RMB {total_cost:,.0f}</td>"
             rows_html += f"<td style='text-align:center'>{feishu}</td>"
@@ -172,7 +178,7 @@ def _render_table(projects):
     </style>
     <table>
     <tr><th>阶段</th><th>年月</th><th>编号</th><th>品牌</th><th>客户</th><th>金额</th>
-    <th>成本细项</th><th>成本金额</th><th>总成本</th><th>立项</th><th>到账</th><th>结案</th></tr>
+    <th>执行周期</th><th>预计付款</th><th>成本细项</th><th>成本金额</th><th>总成本</th><th>立项</th><th>到账</th><th>结案</th></tr>
     {rows_html}
     </table>
     """
