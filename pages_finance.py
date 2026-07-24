@@ -276,12 +276,57 @@ def page_approval():
                         with st.spinner("生成盖章PDF..."):
                             try:
                                 _regen_and_approve(p, user['id'])
-                                st.success("已通过！"); st.rerun()
+                                st.success("已通过！")
+                                # Show email template
+                                code = p.get('project_code','')
+                                month_str = code[6:8] if len(code)>=8 else ''
+                                MONTHS = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
+                                          '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
+                                m = MONTHS.get(month_str,'')
+                                subj = f"Invoice for {p.get('brand_name','')} {m} Campaign / {p.get('project_code','')}"
+                                body = f"""Dear all,
+
+Please find attached the invoice for **{p.get('brand_name','')} {p.get('project_name','')}** Project.
+
+Amount: {p.get('currency','USD')} {p.get('amount',0):,.2f}
+Invoice No: {p.get('project_code','')}
+
+Please review at your convenience and let us know if you have any questions.
+Thank you for your kind attention."""
+
+                st.session_state['just_approved'] = {
+                    'name': f"{p.get('brand_name','')}-{m}-invoice.pdf",
+                    'path': tempfile.mktemp(suffix='.pdf'),
+                    'brand': p.get('brand_name',''),
+                    'code': p.get('project_code',''),
+                    'email_subj': subj, 'email_body': body,
+                }
+                # Generate stamped PDF for download
+                _gen_stamped_only(p, st.session_state['just_approved']['path'])
+                st.rerun()
                             except Exception as e: st.error(f"失败: {e}")
                     if st.button("❌ 驳回", key=f"no_{p['id']}", use_container_width=True):
                         reject_project(p['id'], user['id']); st.warning("已驳回"); st.rerun()
     else:
         st.success("✅ 没有需要审核的项目")
+
+    # Show just-approved banner with download + email
+    if 'just_approved' in st.session_state and st.session_state.get('just_approved'):
+        ja = st.session_state['just_approved']
+        st.divider()
+        st.success(f"✅ 审核通过！{ja['brand']} ({ja['code']})")
+        col_dl, col_email = st.columns([1, 2])
+        with col_dl:
+            if os.path.exists(ja['path']):
+                with open(ja['path'], "rb") as f:
+                    st.download_button("📥 下载盖章PDF", f, file_name=ja['name'],
+                                      key="dl_ja", use_container_width=True)
+        with col_email:
+            with st.expander("📧 邮件文案（发送给客户）", expanded=True):
+                st.text_input("主题", value=ja.get('email_subj',''), key="ja_subj")
+                st.text_area("正文", value=ja.get('email_body',''), height=180, key="ja_body")
+        if st.button("✅ 已处理"):
+            st.session_state['just_approved'] = None; st.rerun()
 
     # Approved projects with download
     st.divider()
