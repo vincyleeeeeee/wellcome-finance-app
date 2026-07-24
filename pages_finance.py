@@ -184,6 +184,25 @@ def _render_table(projects):
     """
     st.markdown(html, unsafe_allow_html=True)
 
+    # Quick action: mark as paid for approved but unpaid projects
+    st.divider()
+    unpaid = [p for p in projects if p.get('status')=='approved' and not p.get('payment_received')]
+    if unpaid:
+        st.subheader("💰 到账操作")
+        cols = st.columns(min(len(unpaid), 5))
+        for i, p in enumerate(unpaid[:10]):
+            with cols[i % 5]:
+                with st.container(border=True):
+                    st.caption(f"**{p.get('brand_name','')}**")
+                    st.caption(f"{p.get('project_code','')}")
+                    if st.button("✅ 标记到账", key=f"paid_quick_{p['id']}", use_container_width=True):
+                        from utils.database import get_connection
+                        get_connection().table("projects").update({
+                            "payment_received": True,
+                            "received_date": datetime.now().strftime('%Y-%m-%d'),
+                        }).eq("id", p['id']).execute()
+                        st.rerun()
+
 
 def _export_excel(projects):
     import openpyxl as xl
