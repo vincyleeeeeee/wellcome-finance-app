@@ -273,7 +273,9 @@ def page_approval():
                     _gen_stamped_only(p, stamped_path)
                     code = p.get('project_code','')
                     month_str = code[6:8] if len(code)>=8 else ''
-                    month_name = f"{int(month_str)}月" if month_str.isdigit() else ''
+                    MONTH_NAMES = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
+                                   '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
+                    month_name = MONTH_NAMES.get(month_str, '')
                     fname = f"{p.get('brand_name','')}-{month_name}-invoice.pdf"
                     with open(stamped_path, 'rb') as f:
                         st.download_button("📥 盖章PDF", f, file_name=fname,
