@@ -230,25 +230,50 @@ def _act_submit(ed, user):
         for e in errs: st.error(e)
         return
 
-    st.success("✅ 条件满足，请确认：")
-    client = get_client_by_id(ed.get('client_id')) or {}
-    c1,c2=st.columns(2)
-    with c1:
-        st.write(f"项目：{ed.get('project_name','')}")
-        st.write(f"品牌：{ed.get('brand_name','')}")
-        st.write(f"编号：{ed.get('project_code','')}")
-    with c2:
-        st.write(f"金额：{ed.get('currency','USD')} {ed.get('amount',0):,.2f}")
-        st.write(f"成本(RMB)：¥{ed.get('estimated_cost',0):,.0f}")
-        st.write(f"到期：{str(ed.get('due_date',''))[:10]}")
+    # Step 1: Review and confirm info
+    if 'invoice_confirmed' not in st.session_state:
+        st.session_state['invoice_confirmed'] = False
 
-    f_ok = st.checkbox("已在飞书立项", value=ed.get('feishu_approved',False))
-    if st.button("📤 确认无误，提交财务审核", type="primary", use_container_width=True):
-        get_connection().table("projects").update({
-            "feishu_approved":f_ok, "status":"pending"
-        }).eq("id",ed['id']).execute()
-        st.success("✅ 已提交！等待财务审核通过。")
-        st.balloons(); st.rerun()
+    if not st.session_state['invoice_confirmed']:
+        st.success("✅ 条件满足，请核对信息并补充/修改（如有需要）")
+        client = get_client_by_id(ed.get('client_id')) or {}
+        c1,c2=st.columns(2)
+        with c1:
+            st.write(f"项目：{ed.get('project_name','')}")
+            st.write(f"品牌：{ed.get('brand_name','')}")
+            st.write(f"编号：{ed.get('project_code','')}")
+        with c2:
+            st.write(f"金额：{ed.get('currency','USD')} {ed.get('amount',0):,.2f}")
+            st.write(f"成本(RMB)：¥{ed.get('estimated_cost',0):,.0f}")
+            st.write(f"到期：{str(ed.get('due_date',''))[:10]}")
+
+        st.text_area("备注/补充信息（可选）", key="inv_note", placeholder="如分批付款、特殊要求等...")
+
+        if st.button("✅ 确认信息无误，进入提交", type="primary", use_container_width=True):
+            st.session_state['invoice_confirmed'] = True
+            st.rerun()
+    else:
+        # Step 2: Submit
+        st.success("✅ 信息已确认，请点击下方按钮提交")
+        f_ok = st.checkbox("已在飞书立项", value=ed.get('feishu_approved',False))
+        note = st.session_state.get('inv_note','')
+        if note:
+            st.caption(f"备注：{note}")
+
+        col_back, col_submit = st.columns(2)
+        with col_back:
+            if st.button("← 返回修改信息", use_container_width=True):
+                st.session_state['invoice_confirmed'] = False
+                st.rerun()
+        with col_submit:
+            if st.button("📤 提交财务审核", type="primary", use_container_width=True):
+                get_connection().table("projects").update({
+                    "feishu_approved":f_ok, "status":"pending",
+                    "content_type": (ed.get('content_type','') + f" [备注：{note}]") if note else ed.get('content_type',''),
+                }).eq("id",ed['id']).execute()
+                st.session_state['invoice_confirmed'] = False
+                st.success("✅ 已提交！等待财务审核通过。")
+                st.balloons(); st.rerun()
 
 
 def _act_approved(ed, user):
