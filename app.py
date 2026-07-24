@@ -186,9 +186,6 @@ def render_sidebar():
                      type="primary" if st.session_state.page == "clients" else "secondary"):
             st.session_state.page = "clients"
 
-        if st.button("📋 项目历史", use_container_width=True,
-                     type="primary" if st.session_state.page == "history" else "secondary"):
-            st.session_state.page = "history"
 
         # Finance users: simple, clear pages
         if user['role'] in ('finance', 'admin'):
