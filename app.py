@@ -1046,6 +1046,10 @@ def page_receipt():
         st.error("无权访问，仅财务角色可操作")
         return
 
+    # Check if coming from workspace with a pre-selected project
+    pre_sel_id = st.session_state.pop('receipt_project_id', None)
+    pre_sel_proj = get_project_by_id(pre_sel_id) if pre_sel_id else None
+
     # Get approved projects to reference
     all_projects = get_projects(limit=200)
     approved = [p for p in all_projects if p.get('status') == 'approved']
@@ -1055,7 +1059,14 @@ def page_receipt():
 
     mode = st.radio("选择方式", ["从已通过项目生成", "手动填写"], horizontal=True)
 
-    if mode == "从已通过项目生成" and approved:
+    if pre_sel_proj and mode == "从已通过项目生成":
+        # Auto-select the project from workspace
+        st.info(f"📌 已选择项目：**{pre_sel_proj.get('brand_name','')}** ({pre_sel_proj.get('project_code','')})")
+
+    if pre_sel_proj:
+        client = client_map.get(pre_sel_proj['client_id'], {})
+        _receipt_form(client, pre_sel_proj)
+    elif mode == "从已通过项目生成" and approved:
         proj_options = {f"{p['brand_name']} — {p['project_code']} ({p.get('currency','USD')} {p['amount']:,.0f})": p
                         for p in approved}
         selected_label = st.selectbox("选择已通过的项目", list(proj_options.keys()))
