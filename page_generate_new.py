@@ -217,7 +217,7 @@ def _stage_receipt(edit_data, user):
 
 def _form_compact(edit_data, clients, client_names, cmap, user):
     if not edit_data: return
-    with st.expander("✏️ 编辑基本信息", expanded=False):
+    with st.expander("✏️ 编辑基本信息", expanded=True):
         _show_info_fields(edit_data, client_names, cmap, user)
 
 
