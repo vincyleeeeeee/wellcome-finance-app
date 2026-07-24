@@ -144,9 +144,9 @@ def _render_table(projects):
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{exec_period}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{exp_pay}</td>"
                 rows_html += f"<td>{item.get('name','')}</td>"
-                rows_html += f"<td style='text-align:right'>{item.get('currency','RMB')} {item.get('amount',0):,.0f}</td>"
+                rows_html += f"<td style='text-align:right'>{item.get('amount',0):,.0f}</td>"
                 if idx == 0:
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>RMB {total_cost:,.0f}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{total_cost:,.0f}</td>"
                 if idx == 0:
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{feishu}</td>"
                 if idx == 0:
@@ -163,8 +163,8 @@ def _render_table(projects):
             rows_html += f"<td style='text-align:center'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
             rows_html += f"<td style='text-align:center'>{exec_period}</td>"
             rows_html += f"<td style='text-align:center'>{exp_pay}</td>"
-            rows_html += f"<td></td><td style='text-align:right'>RMB {total_cost:,.0f}</td>"
-            rows_html += f"<td style='text-align:center'>RMB {total_cost:,.0f}</td>"
+            rows_html += f"<td></td><td style='text-align:right'>{total_cost:,.0f}</td>"
+            rows_html += f"<td style='text-align:center'>{total_cost:,.0f}</td>"
             rows_html += f"<td style='text-align:center'>{feishu}</td>"
             rows_html += f"<td style='text-align:center'>{paid}</td>"
             rows_html += f"<td style='text-align:center'>{closure}</td>"
@@ -274,7 +274,7 @@ def page_approval():
                     st.write(f"**{p.get('client_short','')}** | {p.get('currency','USD')} **{p.get('amount',0):,.2f}** | {feishu_badge}")
                     if p.get('estimated_cost'):
                         cd=_fmt_cost_line(p.get('cost_breakdown','') or '')
-                        st.caption(f"预估成本: RMB {p.get('estimated_cost',0):,.0f}"+(f"（{cd}）" if cd else ""))
+                        st.caption(f"预估成本: {p.get('estimated_cost',0):,.0f}"+(f"（{cd}）" if cd else ""))
                     st.caption(f"提交: {(p.get('created_at','') or '')[:10]}")
                 with col_btn:
                     # Show stamped confirmation for download
