@@ -211,6 +211,7 @@ def render_sidebar():
                       on_click=_nav_to, args=("admin",))
 
         st.divider()
+        st.markdown("[📊 项目表格(飞书)](https://jcni3mh356wi.feishu.cn/sheets/MIqusnakJh97rYty9AZcyojSnoe?sheet=0TY9Ac)")
         st.button("🚪 退出登录", on_click=logout, use_container_width=True)
 
 
