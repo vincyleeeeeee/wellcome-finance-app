@@ -242,6 +242,13 @@ def page_approval():
                         st.caption(f"预估成本: RMB {p.get('estimated_cost',0):,.0f}"+(f"（{cd}）" if cd else ""))
                     st.caption(f"提交: {(p.get('created_at','') or '')[:10]}")
                 with col_btn:
+                    # Show Feishu screenshot if available
+                    if p.get('feishu_screenshot'):
+                        with st.expander("📎 飞书审批截图", expanded=False):
+                            import base64
+                            try:
+                                st.image(base64.b64decode(p['feishu_screenshot']))
+                            except: pass
                     with st.expander("📄 预览Invoice", expanded=True):
                         _show_invoice_preview(p)
                     _gen_invoice_dl(p)
