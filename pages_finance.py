@@ -65,7 +65,7 @@ def _render_table(projects):
         stage = STAGE_MAP.get(p.get('status', ''), p.get('status', '?'))
         closure = CLOSURE_MAP.get(p.get('closure_status', 'active'), '')
         paid = '✅' if p.get('payment_received') else ''
-        feishu = '✅' if p.get('feishu_approved') else ''
+        feishu = '是' if p.get('feishu_approved') else '否'
         total_cost = p.get('estimated_cost',0) or 0
         # Extract year-month from project code: WELL260701xxx → 2026-07
         code = p.get('project_code','')
@@ -119,7 +119,7 @@ def _render_table(projects):
     </style>
     <table>
     <tr><th>阶段</th><th>年月</th><th>编号</th><th>品牌</th><th>客户</th><th>金额</th>
-    <th>成本细项</th><th>成本金额</th><th>总成本</th><th>飞书</th><th>到账</th><th>结案</th></tr>
+    <th>成本细项</th><th>成本金额</th><th>总成本</th><th>是否立项</th><th>到账</th><th>结案</th></tr>
     {rows_html}
     </table>
     """
