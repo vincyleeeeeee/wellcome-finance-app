@@ -207,7 +207,7 @@ def _render_table(projects):
 
 def _export_excel(projects):
     import openpyxl as xl
-    from openpyxl.styles import Font, Alignment, Border, Side, BorderSide
+    from openpyxl.styles import Font, Alignment, Border, Side
     wb = xl.Workbook(); ws = wb.active; ws.title = "成本明细"
     hs = ['项目编号','品牌','客户','阶段','金额','成本细项','成本金额','币种','到账','结案']
     thin = Side(style='thin')
@@ -250,7 +250,7 @@ def _export_excel(projects):
         # Borders
         for r in range(start_row, end_row+1):
             for c in range(1,11):
-                ws.cell(r,c).border=Border(bottom=BorderSide(style='hair'))
+                ws.cell(r,c).border=Border(bottom=Side(style='hair'))
 
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
     st.download_button("📥 下载 Excel", buf, file_name="项目成本明细.xlsx",
