@@ -25,6 +25,7 @@ from utils.generate import (
 from utils.pdf_utils import generate_stamped_pdf
 from utils.receipt_pdf import generate_receipt_pdf
 from pages_finance import page_overview, page_approval
+from pages_workspace import page_workspace
 
 
 def _fmt_cost(cost_json: str) -> str:
@@ -172,6 +173,10 @@ def render_sidebar():
 
         st.divider()
 
+        if st.button("📝 项目工作台", use_container_width=True,
+                     type="primary" if st.session_state.page == "workspace" else "secondary"):
+            st.session_state.page = "workspace"
+
         if st.button("📄 生成文档", use_container_width=True,
                      type="primary" if st.session_state.page == "generate" else "secondary"):
             st.session_state.page = "generate"
@@ -243,7 +248,14 @@ def page_login():
             else:
                 _save_session(user['id'])
                 st.session_state.user = user
-                st.session_state.page = "generate"
+                st.session_state.page = "workspace"
+                st.rerun()
+            elif user['approved'] == 0:
+                st.warning("你的账号尚未通过审核，请等待管理员审批")
+            else:
+                _save_session(user['id'])
+                st.session_state.user = user
+                st.session_state.page = "workspace"
                 st.rerun()
 
     with tab_register:
@@ -1351,6 +1363,7 @@ else:
     else:
         render_sidebar()
         pages = {
+            "workspace": page_workspace,
             "generate": page_generate,
             "clients": page_clients,
             "history": page_history,
