@@ -3,6 +3,7 @@
 import streamlit as st
 import os
 import sys
+import base64
 from datetime import datetime
 
 # Ensure utils is importable
@@ -484,7 +485,15 @@ def page_generate():
                                  help="邮件中使用，默认小红书")
         only_invoice = st.checkbox("只要 Invoice（不生成确认函）", value=False)
         only_confirmation = st.checkbox("只要确认函（不生成 Invoice）", value=False)
-        feishu_approved = st.checkbox("已在飞书立项（财务审核通过前提）", value=False)
+        feishu_approved = st.checkbox("已在飞书立项（财务审核通过前提）", value=False,
+                                     help="勾选后需上传飞书审批截图")
+        feishu_screenshot = None
+        if feishu_approved or submit_approval:
+            feishu_screenshot = st.file_uploader(
+                "📎 上传飞书项目审批截图 *", type=["png","jpg","jpeg","webp","bmp"],
+                accept_multiple_files=False,
+                help="支持拖拽、点击上传、粘贴截图"
+            )
         submit_approval = st.checkbox("生成后提交财务审核", value=not feishu_approved)
         expected_payment_date = st.date_input("预计客户到账时间", value=None,
                                               help="客户的预计付款日期，用于财务跟踪")
@@ -556,6 +565,8 @@ def page_generate():
         if st.button("🚀 生成文档", type="primary", use_container_width=True):
             if not all([project_code, project_name, brand_name, amount > 0]):
                 st.error("请填写所有带 * 的必填项")
+            elif submit_approval and not feishu_screenshot:
+                st.error("提交财务审核必须上传飞书项目审批截图")
             else:
                 # Build project dict for generation
                 proj = {
@@ -579,6 +590,7 @@ def page_generate():
                     'cost_currency': cost_currency,
                     'cost_breakdown': cost_breakdown,
                     'feishu_approved': feishu_approved,
+                    'feishu_screenshot': base64.b64encode(feishu_screenshot.read()).decode() if feishu_screenshot else '',
                     'expected_payment_date': expected_payment_date.strftime('%Y-%m-%d') if expected_payment_date else None,
                     'created_by': st.session_state.user['id'],
                     'client_id': client_info['id'],
