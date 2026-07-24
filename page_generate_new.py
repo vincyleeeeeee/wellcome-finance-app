@@ -170,7 +170,8 @@ def _show_info_fields(edit_data, client_names, cmap, user):
 
         users_list = get_all_users()
         owner_names = [u['username'] for u in users_list]
-        dow = owner_names.index(edit_data.get('owner_name','')) if edit_data and edit_data.get('owner_name') in owner_names else 0
+        default_owner = edit_data.get('owner_name','') if edit_data else st.session_state.user['username']
+        dow = owner_names.index(default_owner) if default_owner in owner_names else 0
         st.selectbox("项目负责人 *", owner_names, index=dow, key="nf_owner")
 
         cm_m = st.selectbox("编号月份", list(range(1,13)), index=datetime.now().month-1, format_func=lambda m:f"{m}月")
