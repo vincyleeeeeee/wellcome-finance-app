@@ -250,13 +250,6 @@ def page_login():
                 st.session_state.user = user
                 st.session_state.page = "workspace"
                 st.rerun()
-            elif user['approved'] == 0:
-                st.warning("你的账号尚未通过审核，请等待管理员审批")
-            else:
-                _save_session(user['id'])
-                st.session_state.user = user
-                st.session_state.page = "workspace"
-                st.rerun()
 
     with tab_register:
         st.subheader("注册")
