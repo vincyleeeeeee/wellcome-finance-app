@@ -313,7 +313,6 @@ def _save_info(edit_data, client_names, cmap, user):
             'estimated_cost':float(total),'cost_currency':'RMB','cost_breakdown':cost_items,
             'created_by':user['id'],'client_id':c.get('id'),
             'owner_name':st.session_state.get('nf_owner',''),
-            'invoice_project_name':f"{st.session_state.get('nf_brand','')} – {st.session_state.get('nf_posts','')} CONTENT PACKAGE",
         }
         if edit_data:
             get_connection().table("projects").update(data).eq("id",edit_data['id']).execute()
