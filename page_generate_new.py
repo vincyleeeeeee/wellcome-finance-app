@@ -26,23 +26,20 @@ def page_generate():
         # Stage labels above slider
         all_labels = ['📝 信息','📄 确认函','📎 客户盖章确认函','🧾 发票','💰 收据']
         st.caption("   ".join(all_labels))
-        # Use session_state to persist slider value across reruns
+        # Slider with persistent state
         slider_key = f"stage_slider_{edit_id}"
         if slider_key not in st.session_state:
             st.session_state[slider_key] = stage_idx
-
-        all_labels = ['📝 信息','📄 确认函','📎 客户盖章确认函','🧾 发票','💰 收据']
-        st.caption("   ".join(all_labels))
-        target = st.select_slider(
-            "👇 拖动到当前需要操作的步骤",
+        stage_idx = st.select_slider(
+            "👇 拖动选择步骤（或点下一步）",
             options=[0,1,2,3,4],
             value=st.session_state[slider_key],
             format_func=lambda x: '',
             label_visibility="collapsed",
-            key=slider_key
+            key=slider_key + "_widget"
         )
-        st.caption(f"当前：**{all_labels[target]}**")
-        stage_idx = target
+        st.session_state[slider_key] = stage_idx
+        st.caption(f"当前步骤：**{all_labels[stage_idx]}**")
 
         c_left, c_right = st.columns(2)
         with c_left:
@@ -51,7 +48,7 @@ def page_generate():
                 st.session_state.pop(slider_key, None)
                 st.rerun()
         with c_right:
-            next_step = min(stage_idx + 1, 4)
+            next_step = min(st.session_state[slider_key] + 1, 4)
             if st.button(f"下一步 → {all_labels[next_step]}", use_container_width=True, type="primary"):
                 st.session_state[slider_key] = next_step
                 st.rerun()
@@ -306,7 +303,7 @@ def _save_info(edit_data, client_names, cmap, user):
         due_d = st.session_state.get('nf_due_date')
         if hasattr(due_d, 'strftime'): due_d = due_d.strftime('%Y-%m-%d')
         data = {
-            'client_short':sel,'project_code':st.session_state.get('nf_code',''),
+            'project_code':st.session_state.get('nf_code',''),
             'project_name':st.session_state.get('nf_name',''),'brand_name':st.session_state.get('nf_brand',''),
             'amount':float(st.session_state.get('nf_amt',0) or 0),'currency':st.session_state.get('nf_cur','USD'),
             'venue':st.session_state.get('nf_venue',''),'execution_period':st.session_state.get('nf_period',''),
