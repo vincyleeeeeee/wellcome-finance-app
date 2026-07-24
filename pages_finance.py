@@ -31,7 +31,23 @@ def _fmt_cost_line(cost_json: str) -> str:
     except: return cost_json
 
 
+def _inject_large_font_css():
+    st.markdown("""
+    <style>
+    html, body, [class*="css"] { font-size: 16px !important; }
+    div[data-testid="stMetricValue"] { font-size: 28px !important; }
+    h1 { font-size: 28px !important; }
+    h2 { font-size: 22px !important; }
+    h3 { font-size: 18px !important; }
+    button { font-size: 16px !important; padding: 10px 14px !important; }
+    input, select { font-size: 16px !important; }
+    table { font-size: 14px !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+
 def page_overview():
+    _inject_large_font_css()
     st.title("📊 项目总览")
     projects = get_projects(limit=500)
     if not projects: st.info("暂无项目"); return
@@ -207,7 +223,7 @@ def _export_excel(projects):
 
 
 def page_approval():
-    """Simple approval page."""
+    _inject_large_font_css()
     st.title("⏳ 待审核")
     pending = get_pending_approvals()
     user=st.session_state.user
