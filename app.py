@@ -236,9 +236,11 @@ def page_login():
 
     with tab_login:
         st.subheader("登录")
-        email = st.text_input("邮箱", placeholder="your@email.com")
-        password = st.text_input("密码", type="password")
-        if st.button("🔐 登录", type="primary", use_container_width=True):
+        with st.form("login_form"):
+            email = st.text_input("邮箱", placeholder="your@email.com")
+            password = st.text_input("密码", type="password")
+            submitted = st.form_submit_button("🔐 登录", type="primary", use_container_width=True)
+        if submitted:
             user = authenticate(email.strip(), password.strip())
             if user is None:
                 st.error("邮箱或密码错误")

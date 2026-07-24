@@ -204,12 +204,25 @@ def _show_info_fields(edit_data, client_names, cmap, user):
                 a = st.number_input("金额", key=f"nf_a_{cat}", value=None, step=100.0)
                 cu = st.selectbox("币种", ["RMB","USD","THB","MYR"], key=f"nf_c_{cat}")
                 if a>0: tr+=a*R.get(cu,1); items.append({"name":cat,"amount":a,"currency":cu})
-    cn = st.text_input("其他项", key="nf_cn")
-    if cn:
-        c1,c2=st.columns([2,1])
-        with c1: ca=st.number_input("金额",key="nf_ca",value=None,step=100.0)
-        with c2: cc=st.selectbox("币种",["RMB","USD","THB","MYR"],key="nf_cc")
-        if ca>0: tr+=ca*R.get(cc,1); items.append({"name":cn,"amount":ca,"currency":cc})
+    # Dynamic custom cost items
+    if 'custom_cost_count' not in st.session_state:
+        st.session_state['custom_cost_count'] = 1
+    for i in range(st.session_state['custom_cost_count']):
+        cc1,cc2,cc3 = st.columns([2,2,1])
+        with cc1:
+            cname = st.text_input(f"分类名#{i+1}", key=f"nf_cn{i}", placeholder="如KOL费用、场地费、道具...")
+        with cc2:
+            camt = st.number_input("金额", key=f"nf_ca{i}", value=None, step=100.0)
+        with cc3:
+            ccur = st.selectbox("币种",["RMB","USD","THB","MYR"], key=f"nf_cc{i}")
+        if cname and camt and camt > 0:
+            tr += camt * R.get(ccur,1)
+            items.append({"name":cname,"amount":camt,"currency":ccur})
+    col_add, _ = st.columns([1,4])
+    with col_add:
+        if st.button("➕ 添加分类", use_container_width=True):
+            st.session_state['custom_cost_count'] += 1
+            st.rerun()
     if tr>0: st.info(f"总成本(RMB): ¥{tr:,.0f}")
 
     if st.button("💾 保存信息", type="primary", use_container_width=True):
