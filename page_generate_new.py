@@ -26,12 +26,20 @@ def page_generate():
         # Stage labels above slider
         all_labels = ['📝 信息','📄 确认函','📎 盖章','🧾 发票','💰 收据']
         st.caption("   ".join(all_labels))
+        # Use session_state to persist slider value across reruns
+        slider_key = f"stage_slider_{edit_id}"
+        if slider_key not in st.session_state:
+            st.session_state[slider_key] = stage_idx
+
+        all_labels = ['📝 信息','📄 确认函','📎 盖章','🧾 发票','💰 收据']
+        st.caption("   ".join(all_labels))
         target = st.select_slider(
             "👇 拖动到当前需要操作的步骤",
             options=[0,1,2,3,4],
-            value=stage_idx,
+            value=st.session_state[slider_key],
             format_func=lambda x: '',
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            key=slider_key
         )
         st.caption(f"当前：**{all_labels[target]}**")
         stage_idx = target
@@ -39,11 +47,13 @@ def page_generate():
         c_left, c_right = st.columns(2)
         with c_left:
             if st.button("❌ 取消", use_container_width=True):
-                st.session_state.pop('edit_project_id', None); st.rerun()
+                st.session_state.pop('edit_project_id', None)
+                st.session_state.pop(slider_key, None)
+                st.rerun()
         with c_right:
             next_step = min(stage_idx + 1, 4)
             if st.button(f"下一步 → {all_labels[next_step]}", use_container_width=True, type="primary"):
-                stage_idx = next_step
+                st.session_state[slider_key] = next_step
                 st.rerun()
     else:
         st.info("填一次基本信息，后续各阶段按流程推进")
@@ -130,7 +140,7 @@ def _stage_invoice(edit_data, user):
     if not edit_data:
         st.warning("请先完成前面阶段"); return
     if not edit_data.get('stamped_confirmation'):
-        st.warning("⚠️ 尚未上传客户盖章确认函，建议先在「📎 盖章」阶段上传")
+        st.error("⚠️ 请先在「📎 盖章」阶段上传客户盖章确认函"); return
     f_ok = st.checkbox("已在飞书立项", value=edit_data.get('feishu_approved',False))
     subm = st.checkbox("生成后提交财务审核", value=True)
     if st.button("🧾 生成发票并提交审核", type="primary", use_container_width=True):
