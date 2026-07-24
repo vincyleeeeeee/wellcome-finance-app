@@ -57,6 +57,16 @@ def _num_to_chinese(n: int) -> str:
     return result
 
 
+def _fmt_date(val):
+    """Format date consistently as YYYY-MM-DD."""
+    if val is None: return ""
+    if isinstance(val, datetime.datetime):
+        return val.strftime('%Y-%m-%d')
+    if isinstance(val, datetime.date):
+        return val.strftime('%Y-%m-%d')
+    return str(val)[:10]
+
+
 def _amount_chinese(amount: float, currency: str = "USD") -> str:
     """Get Chinese uppercase amount with 整 suffix. Handles decimals."""
     integer_part = int(amount)
@@ -65,6 +75,9 @@ def _amount_chinese(amount: float, currency: str = "USD") -> str:
     cn = _num_to_chinese(integer_part)
     result = f"{cn}元"
 
+    # Currency suffix
+    suffix = "美元整" if currency == "USD" else "元整"
+
     if decimal_part > 0:
         jiao = decimal_part // 10
         fen = decimal_part % 10
@@ -72,9 +85,9 @@ def _amount_chinese(amount: float, currency: str = "USD") -> str:
             result += f"{_CN_DIGITS[jiao]}角"
         if fen > 0:
             result += f"{_CN_DIGITS[fen]}分"
-        result += "整"
+        result += suffix
     else:
-        result += "整"
+        result += suffix
 
     return result
 
@@ -160,8 +173,8 @@ def generate_invoice(client: dict, project: dict) -> str:
     ws['C10'] = client.get('phone') if client.get('phone') and client['phone'] != '（待补充）' else None
     ws['C11'] = client.get('email') if client.get('email') and client['email'] != '（待补充）' else None
     ws['E8'] = project['project_code']
-    ws['E9'] = project['invoice_date']
-    ws['E10'] = project['due_date']
+    ws['E9'] = _fmt_date(project['invoice_date'])
+    ws['E10'] = _fmt_date(project['due_date'])
     ws['E11'] = project['project_code']
 
     # Currency headers
