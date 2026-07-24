@@ -117,11 +117,13 @@ def page_workspace():
                                 "expected_payment_date": ne if ne else None,
                             }).eq("id", pid).execute()
                             st.success("已保存"); st.rerun()
-                    # Mark paid
+                    # Mark paid → auto receipt flow
                     if p.get('status') == 'approved' and not p.get('payment_received') and user['role'] in ('finance','admin'):
-                        if st.button("💰 标记到账", key=f"wsp_{pid}", use_container_width=True):
+                        if st.button("💰 标记到账并开收据", key=f"wsp_{pid}", use_container_width=True):
                             get_connection().table("projects").update({
                                 "payment_received": True,
                                 "received_date": datetime.now().strftime('%Y-%m-%d'),
                             }).eq("id", pid).execute()
+                            st.session_state['receipt_project_id'] = pid
+                            st.session_state.page = "receipt"
                             st.rerun()
