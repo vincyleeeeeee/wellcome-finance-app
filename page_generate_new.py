@@ -249,7 +249,7 @@ def _act_submit(ed, user):
         client = get_client_by_id(ed.get('client_id')) or {}
 
         # Invoice type
-        inv_type = st.selectbox("发票类型", ["服务款-全款","服务款-前款","服务款-后款","样品费报销","差旅费报销"],
+        inv_type = st.selectbox("发票类型", ["服务款-全款","服务款-前款","服务款-中款","服务款-后款","样品费报销","差旅费报销"],
                                key="inv_type")
         default_amt = float(ed.get('amount',0))
         inv_amount = st.number_input("本次开票金额", value=default_amt if default_amt>0 else None,
