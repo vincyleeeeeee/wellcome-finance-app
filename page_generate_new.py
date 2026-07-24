@@ -97,7 +97,17 @@ def _show_info(edit_data, client_names, cmap, user):
         dow = unames.index(edit_data.get('owner_name','')) if edit_data.get('owner_name') in unames else 0
         st.selectbox("负责人", unames, index=dow, key="ei_owner")
 
-        st.text_input("项目编号", value=edit_data.get('project_code',''), key="ei_code")
+        # Project code with month selector
+        from utils.database import get_next_code_for_month
+        cm = st.selectbox("编号月份", list(range(1,13)),
+                          index=datetime.now().month-1,
+                          format_func=lambda m:f"{m}月", key="ei_month")
+        default_code = edit_data.get('project_code','')
+        if not default_code:
+            try: default_code = get_next_code_for_month(datetime.now().year, cm)
+            except: pass
+        st.text_input("项目编号", value=default_code, key="ei_code")
+        st.caption(f"💡 自动生成，可直接修改。{cm}月当前下一个编号已显示。")
         st.text_input("项目名称", value=edit_data.get('project_name',''), key="ei_name")
         st.text_input("品牌名", value=edit_data.get('brand_name',''), key="ei_brand")
         ci = 0 if edit_data.get('currency','USD')=='USD' else 1
@@ -235,19 +245,27 @@ def _act_submit(ed, user):
         st.session_state['invoice_confirmed'] = False
 
     if not st.session_state['invoice_confirmed']:
-        st.success("✅ 条件满足，请核对信息并补充/修改（如有需要）")
+        st.success("✅ 条件满足，请核对信息并补充")
         client = get_client_by_id(ed.get('client_id')) or {}
+
+        # Invoice type
+        inv_type = st.selectbox("发票类型", ["服务款-前款","服务款-后款","样品费报销","差旅费报销"],
+                               key="inv_type")
+        default_amt = float(ed.get('amount',0))
+        inv_amount = st.number_input("本次开票金额", value=default_amt if default_amt>0 else None,
+                                     step=100.0, key="inv_amt",
+                                     help=f"合同总额：{ed.get('currency','USD')} {ed.get('amount',0):,.2f}")
+        inv_note = st.text_area("备注", key="inv_note", placeholder="说明本次开票内容...")
+
         c1,c2=st.columns(2)
         with c1:
             st.write(f"项目：{ed.get('project_name','')}")
             st.write(f"品牌：{ed.get('brand_name','')}")
             st.write(f"编号：{ed.get('project_code','')}")
         with c2:
-            st.write(f"金额：{ed.get('currency','USD')} {ed.get('amount',0):,.2f}")
+            st.write(f"总金额：{ed.get('currency','USD')} {ed.get('amount',0):,.2f}")
             st.write(f"成本(RMB)：¥{ed.get('estimated_cost',0):,.0f}")
             st.write(f"到期：{str(ed.get('due_date',''))[:10]}")
-
-        st.text_area("备注/补充信息（可选）", key="inv_note", placeholder="如分批付款、特殊要求等...")
 
         if st.button("✅ 确认信息无误，进入提交", type="primary", use_container_width=True):
             st.session_state['invoice_confirmed'] = True
@@ -256,9 +274,9 @@ def _act_submit(ed, user):
         # Step 2: Submit
         st.success("✅ 信息已确认，请点击下方按钮提交")
         f_ok = st.checkbox("已在飞书立项", value=ed.get('feishu_approved',False))
-        note = st.session_state.get('inv_note','')
-        if note:
-            st.caption(f"备注：{note}")
+        inv_type = st.session_state.get('inv_type','服务款-前款')
+        inv_amt = st.session_state.get('inv_amt',ed.get('amount',0))
+        st.write(f"发票类型：**{inv_type}** | 金额：{ed.get('currency','USD')} {inv_amt:,.2f}")
 
         col_back, col_submit = st.columns(2)
         with col_back:
@@ -267,12 +285,14 @@ def _act_submit(ed, user):
                 st.rerun()
         with col_submit:
             if st.button("📤 提交财务审核", type="primary", use_container_width=True):
+                note = st.session_state.get('inv_note','')
                 get_connection().table("projects").update({
                     "feishu_approved":f_ok, "status":"pending",
-                    "content_type": (ed.get('content_type','') + f" [备注：{note}]") if note else ed.get('content_type',''),
+                    "amount": float(inv_amt or ed.get('amount',0)),
+                    "content_type": inv_type + (f" [{note}]" if note else ""),
                 }).eq("id",ed['id']).execute()
                 st.session_state['invoice_confirmed'] = False
-                st.success("✅ 已提交！等待财务审核通过。")
+                st.success(f"✅ {inv_type} 已提交！等待财务审核。")
                 st.balloons(); st.rerun()
 
 
