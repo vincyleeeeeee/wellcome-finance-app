@@ -174,39 +174,35 @@ def render_sidebar():
 
         st.divider()
 
-        if st.button("📝 项目工作台", use_container_width=True,
-                     type="primary" if st.session_state.page == "workspace" else "secondary"):
-            st.session_state.page = "workspace"
-
-        if st.button("📄 生成文档", use_container_width=True,
-                     type="primary" if st.session_state.page == "generate" else "secondary"):
-            st.session_state.page = "generate"
-
-        if st.button("👥 客户管理", use_container_width=True,
-                     type="primary" if st.session_state.page == "clients" else "secondary"):
-            st.session_state.page = "clients"
+        # Use radio for instant visual feedback
+        pages = {"📝 项目工作台": "workspace", "📄 生成文档": "generate", "👥 客户管理": "clients"}
+        current_idx = list(pages.values()).index(st.session_state.page) if st.session_state.page in pages.values() else 0
+        selected = st.radio("导航", list(pages.keys()), index=current_idx, label_visibility="collapsed")
+        if pages[selected] != st.session_state.page:
+            st.session_state.page = pages[selected]
+            st.rerun()
 
 
         # Finance users: simple, clear pages
         if user['role'] in ('finance', 'admin'):
             st.divider()
             st.markdown("**💰 财务专区**")
-            if st.button("📊 项目总览", use_container_width=True,
-                         type="primary" if st.session_state.page == "overview" else "secondary"):
-                st.session_state.page = "overview"
             p = len(get_pending_approvals())
-            label = f"⏳ 待审核" + (f" ({p})" if p else "")
-            if st.button(label, use_container_width=True,
-                         type="primary" if st.session_state.page == "approval" else "secondary"):
-                st.session_state.page = "approval"
-            if st.button("🧾 开收据", use_container_width=True,
-                         type="primary" if st.session_state.page == "receipt" else "secondary"):
-                st.session_state.page = "receipt"
+            fin_pages = {"📊 项目总览": "overview",
+                         f"⏳ 待审核 ({p})" if p else "⏳ 待审核": "approval",
+                         "🧾 开收据": "receipt"}
+            fin_idx = list(fin_pages.values()).index(st.session_state.page) if st.session_state.page in fin_pages.values() else 0
+            fin_sel = st.radio("财务导航", list(fin_pages.keys()), index=fin_idx, label_visibility="collapsed")
+            if fin_pages[fin_sel] != st.session_state.page:
+                st.session_state.page = fin_pages[fin_sel]
+                st.rerun()
 
         if user['role'] == 'admin':
             pending = len(get_pending_users())
-            admin_label = f"🔒 用户审核" + (f" ({pending})" if pending else "")
-            if st.button(admin_label, use_container_width=True,
+            adm_pages = {f"🔒 用户审核 ({pending})" if pending else "🔒 用户审核": "admin"}
+            adm_idx = 0 if st.session_state.page == "admin" else -1
+            # Admin is simple - just one button still works since it's only one option
+            if st.button(list(adm_pages.keys())[0], use_container_width=True,
                          type="primary" if st.session_state.page == "admin" else "secondary"):
                 st.session_state.page = "admin"
 

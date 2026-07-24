@@ -74,27 +74,60 @@ def page_workspace():
                 st.write(f"{stage}{paid} **{p.get('brand_name','')}** — {p.get('project_code','')}")
                 st.caption(f"{p.get('currency','USD')} {p.get('amount',0):,.2f} | {p.get('client_short','')} | 👤 {p.get('owner_name','') or '未指定'} | {closure} | {(p.get('created_at','') or '')[:10]}")
             with cc2:
-                # Action buttons
-                if p.get('status') == 'approved' and p.get('stamped_pdf_path'):
-                    stamped = p['stamped_pdf_path']
-                    # Regenerate if path doesn't exist
-                    if os.path.exists(stamped):
-                        with open(stamped, 'rb') as f:
-                            code_p = p.get('project_code','')
-                            ms = code_p[6:8] if len(code_p)>=8 else ''
-                            M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
-                                 '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
-                            fname = f"{p.get('brand_name','')}-{M.get(ms,'')}-invoice.pdf"
-                            st.download_button("📥 盖章PDF", f, file_name=fname,
-                                             key=f"ws_stamp_{pid}", use_container_width=True)
-                elif p.get('status') in ('draft','rejected') and user['id'] == p.get('created_by'):
-                    if st.button("📤 提交审核", key=f"ws_sub_{pid}", use_container_width=True):
-                        submit_for_approval(pid); st.success("已提交"); st.rerun()
+                # Download buttons based on stage
+                code_p = p.get('project_code','')
+                ms = code_p[6:8] if len(code_p)>=8 else ''
+                M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
+                     '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
+                mn = M.get(ms,'')
 
-                # Operations button
-                if st.button("📄 操作", key=f"ws_op_{pid}", use_container_width=True):
+                with st.expander("📥 下载文件", expanded=False):
+                    # Confirmation letter (if generated)
+                    if p.get('status') in ('confirmation_sent','stamped_uploaded','pending','approved'):
+                        # Regenerate confirmation letter for download
+                        pass  # We don't store the path, need to regenerate
+                        st.caption("确认函：去「📄 生成文档」生成")
+
+                    # Stamped confirmation (if uploaded)
+                    if p.get('stamped_confirmation'):
+                        import base64
+                        st.download_button("📎 盖章确认函",
+                                          base64.b64decode(p['stamped_confirmation']),
+                                          file_name=f"{p.get('brand_name','')}-盖章确认函.pdf",
+                                          key=f"ws_sc_{pid}", use_container_width=True)
+
+                    # Stamped invoice
+                    if p.get('status') == 'approved':
+                        stamped = p.get('stamped_pdf_path','')
+                        if stamped and os.path.exists(stamped):
+                            with open(stamped, 'rb') as f:
+                                st.download_button("📥 盖章Invoice",
+                                                  f, file_name=f"{p.get('brand_name','')}-{mn}-invoice.pdf",
+                                                  key=f"ws_inv_{pid}", use_container_width=True)
+
+                    # Receipt (if paid)
+                    if p.get('payment_received'):
+                        st.caption("🧾 收据：去「🧾 开收据」生成")
+
+                # Email templates
+                with st.expander("📧 邮件文案", expanded=False):
+                    subj_inv = f"Invoice for {p.get('brand_name','')} {mn} Campaign / {code_p}"
+                    body_inv = f"Dear all,\n\nPlease find attached the invoice for {p.get('brand_name','')} {p.get('project_name','')} Project.\n\nThank you for your kind attention."
+                    st.text_input("发票主题", value=subj_inv, key=f"wsis_{pid}")
+                    st.text_area("发票内容", value=body_inv, height=100, key=f"wsib_{pid}")
+
+                    subj_cf = f"Confirmation Letter for Review — {p.get('brand_name','')} / {code_p}"
+                    body_cf = f"Dear all,\n\nPlease kindly find the attached confirmation document.\nThank you, and we look forward to your confirmation."
+                    st.text_input("确认函主题", value=subj_cf, key=f"wscs_{pid}")
+                    st.text_area("确认函内容", value=body_cf, height=80, key=f"wscb_{pid}")
+
+                # Edit/operate
+                if st.button("📄 编辑项目", key=f"ws_op_{pid}", use_container_width=True):
                     st.session_state['edit_project_id'] = pid
                     st.session_state.page = "generate"; st.rerun()
+                if p.get('status') in ('draft','rejected') and user['id'] == p.get('created_by'):
+                    if st.button("📤 提交审核", key=f"ws_sub_{pid}", use_container_width=True):
+                        submit_for_approval(pid); st.success("已提交"); st.rerun()
 
             # Editable status (owner or finance/admin)
             if user['id'] == p.get('created_by') or user['role'] in ('finance','admin'):
