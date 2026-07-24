@@ -294,19 +294,19 @@ Invoice No: {p.get('project_code','')}
 Please review at your convenience and let us know if you have any questions.
 Thank you for your kind attention."""
 
-                st.session_state['just_approved'] = {
-                    'name': f"{p.get('brand_name','')}-{m}-invoice.pdf",
-                    'path': tempfile.mktemp(suffix='.pdf'),
-                    'brand': p.get('brand_name',''),
-                    'code': p.get('project_code',''),
-                    'email_subj': subj, 'email_body': body,
-                }
-                # Generate stamped PDF for download
-                _gen_stamped_only(p, st.session_state['just_approved']['path'])
-                st.rerun()
+                                st.session_state['just_approved'] = {
+                                'name': f"{p.get('brand_name','')}-{m}-invoice.pdf",
+                                'path': tempfile.mktemp(suffix='.pdf'),
+                                'brand': p.get('brand_name',''),
+                                'code': p.get('project_code',''),
+                                'email_subj': subj, 'email_body': body,
+                                }
+                                # Generate stamped PDF for download
+                                _gen_stamped_only(p, st.session_state['just_approved']['path'])
+                                st.rerun()
                             except Exception as e: st.error(f"失败: {e}")
                     if st.button("❌ 驳回", key=f"no_{p['id']}", use_container_width=True):
-                        reject_project(p['id'], user['id']); st.warning("已驳回"); st.rerun()
+                    reject_project(p['id'], user['id']); st.warning("已驳回"); st.rerun()
     else:
         st.success("✅ 没有需要审核的项目")
 
