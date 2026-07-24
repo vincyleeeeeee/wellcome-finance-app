@@ -213,6 +213,14 @@ def render_sidebar():
 # ============================================================
 # Login / Register page
 # ============================================================
+def _sync_login_input(field):
+    """Sync autofill values into session state."""
+    if field == 'email':
+        st.session_state['login_email_val'] = st.session_state.get('login_email_field', '')
+    else:
+        st.session_state['login_password_val'] = st.session_state.get('login_password_field', '')
+
+
 def page_login():
     st.title("💰 Wellcome财务自动化平台")
     st.caption("确认函 · Invoice · 收据 — 一键生成")
@@ -221,36 +229,36 @@ def page_login():
 
     with tab_login:
         st.subheader("登录")
-        import re
-        email = st.text_input("邮箱", placeholder="your@email.com", key="login_email",
-                              autocomplete="email")
-        col_pw1, col_pw2 = st.columns([4,1])
-        with col_pw1:
-            password = st.text_input("密码", type="password", key="login_password",
-                                     autocomplete="current-password")
-        with col_pw2:
-            show_pw = st.checkbox("👁", key="show_pw", label_visibility="collapsed")
-            if show_pw:
-                st.caption("显示中")
+        # Store input values in session_state to properly capture autofill
+        if 'login_email_val' not in st.session_state:
+            st.session_state['login_email_val'] = ''
+        if 'login_password_val' not in st.session_state:
+            st.session_state['login_password_val'] = ''
+
+        email = st.text_input("邮箱", placeholder="your@email.com",
+                              key="login_email_field",
+                              value=st.session_state['login_email_val'],
+                              on_change=lambda: _sync_login_input('email'))
+        password = st.text_input("密码", type="password",
+                                 key="login_password_field",
+                                 value=st.session_state['login_password_val'],
+                                 on_change=lambda: _sync_login_input('password'))
 
         if st.button("🔐 登录", type="primary", use_container_width=True):
-            # Aggressive cleaning of autofill artifacts
-            clean_email = email.strip().replace(' ',' ').replace('​','').replace('﻿','')
-            clean_email = re.sub(r'[^\x20-\x7E@.+\-_]', '', clean_email)
-            clean_pass = password.strip().replace(' ',' ').replace('​','').replace('﻿','')
-            if not clean_email or not clean_pass:
-                st.error("请填写邮箱和密码")
+            import re
+            e = st.session_state.get('login_email_val', email or '').strip()
+            p = st.session_state.get('login_password_val', password or '').strip()
+            e = re.sub(r'[^\x20-\x7E@.+\-_]', '', e)
+            user = authenticate(e, p)
+            if user is None:
+                st.error("邮箱或密码错误")
+            elif user['approved'] == 0:
+                st.warning("你的账号尚未通过审核，请等待管理员审批")
             else:
-                user = authenticate(clean_email, clean_pass)
-                if user is None:
-                    st.error(f"邮箱或密码错误")
-                elif user['approved'] == 0:
-                    st.warning("你的账号尚未通过审核，请等待管理员审批")
-                else:
-                    _save_session(user['id'])
-                    st.session_state.user = user
-                    st.session_state.page = "generate"
-                    st.rerun()
+                _save_session(user['id'])
+                st.session_state.user = user
+                st.session_state.page = "generate"
+                st.rerun()
 
     with tab_register:
         st.subheader("注册")
