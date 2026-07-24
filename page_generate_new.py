@@ -24,10 +24,11 @@ def page_generate():
     if edit_data:
         st.info(f"📌 项目：**{edit_data.get('brand_name','')}** ({edit_data.get('project_code','')})")
         target = st.select_slider(
-            "选择当前进度",
+            "拖动选择当前进度（前面的阶段默认已完成）",
             options=[0,1,2,3,4],
             value=stage_idx,
-            format_func=lambda x: ['📝 基本信息','📄 确认函','📎 盖章回传','🧾 开发票','💰 收据'][x]
+            format_func=lambda x: ['📝 填写信息','📄 生成确认函','📎 上传盖章回传','🧾 申请开发票','💰 开收据'][x],
+            help="选择你当前需要操作的步骤"
         )
         stage_idx = target
         if st.button("❌ 取消"):
@@ -181,14 +182,14 @@ def _show_info_fields(edit_data, client_names, cmap, user):
         st.text_input("客户品牌名 *", value=edit_data.get('brand_name','') if edit_data else '', key="nf_brand")
         cur_idx = 0 if (edit_data.get('currency','USD') if edit_data else 'USD')=='USD' else 1
         st.selectbox("币种", ["USD","RMB"], index=cur_idx, key="nf_cur")
-        st.number_input("项目金额 *", min_value=0.0, step=100.0, value=float(edit_data.get('amount',0)) if edit_data else 0.0, key="nf_amt")
+        st.number_input("项目金额 *", min_value=0.0, step=100.0, value=float(edit_data.get('amount',0)) if edit_data else None, key="nf_amt")
 
     with col2:
         st.text_input("执行地点", value=edit_data.get('venue','Bangkok') if edit_data else 'Bangkok', key="nf_venue")
         st.text_input("执行周期", value=edit_data.get('execution_period','') if edit_data else '', key="nf_period")
         st.text_input("预计拍摄时间", value=edit_data.get('shooting_date','') if edit_data else '', key="nf_shoot")
         st.text_input("总发布篇数", value=edit_data.get('total_posts','') if edit_data else '', key="nf_posts")
-        st.date_input("到期日", value=datetime.now(), key="nf_due")
+        st.date_input("到期日", value=datetime.now(), key="nf_due_date")
         st.text_input("合作内容", value="UGC铺量", key="nf_content")
         st.text_input("发布平台", value="小红书", key="nf_plat")
 
@@ -200,13 +201,13 @@ def _show_info_fields(edit_data, client_names, cmap, user):
     for i, cat in enumerate(["拍摄","餐饮交通","发布","补发"]):
         with ccols[i]:
             if st.checkbox(cat, key=f"nf_cb_{cat}"):
-                a = st.number_input("金额", key=f"nf_a_{cat}", value=0.0, step=100.0)
+                a = st.number_input("金额", key=f"nf_a_{cat}", value=None, step=100.0)
                 cu = st.selectbox("币种", ["RMB","USD","THB","MYR"], key=f"nf_c_{cat}")
                 if a>0: tr+=a*R.get(cu,1); items.append({"name":cat,"amount":a,"currency":cu})
     cn = st.text_input("其他项", key="nf_cn")
     if cn:
         c1,c2=st.columns([2,1])
-        with c1: ca=st.number_input("金额",key="nf_ca",value=0.0,step=100.0)
+        with c1: ca=st.number_input("金额",key="nf_ca",value=None,step=100.0)
         with c2: cc=st.selectbox("币种",["RMB","USD","THB","MYR"],key="nf_cc")
         if ca>0: tr+=ca*R.get(cc,1); items.append({"name":cn,"amount":ca,"currency":cc})
     if tr>0: st.info(f"总成本(RMB): ¥{tr:,.0f}")
@@ -222,15 +223,17 @@ def _save_info(edit_data, client_names, cmap, user):
     c = cmap.get(sel,{})
     cost_items = _j.dumps(_collect_cost(), ensure_ascii=False)
     total = sum(i['amount']*{"USD":7.2,"RMB":1.0,"THB":0.2,"MYR":1.55}.get(i['currency'],1) for i in (_collect_cost() or []))
+    due_d = st.session_state.get('nf_due_date')
+    if hasattr(due_d, 'strftime'): due_d = due_d.strftime('%Y-%m-%d')
     data = {
         'client_short':sel,'project_code':st.session_state.get('nf_code',''),
         'project_name':st.session_state.get('nf_name',''),'brand_name':st.session_state.get('nf_brand',''),
-        'amount':st.session_state.get('nf_amt',0),'currency':st.session_state.get('nf_cur','USD'),
+        'amount':float(st.session_state.get('nf_amt',0) or 0),'currency':st.session_state.get('nf_cur','USD'),
         'venue':st.session_state.get('nf_venue',''),'execution_period':st.session_state.get('nf_period',''),
         'shooting_date':st.session_state.get('nf_shoot',''),'total_posts':st.session_state.get('nf_posts',''),
-        'invoice_date':datetime.now().date(),'due_date':st.session_state.get('nf_due'),
+        'invoice_date':str(datetime.now().date()),'due_date':str(due_d or ''),
         'content_type':st.session_state.get('nf_content','UGC铺量'),'platform':st.session_state.get('nf_plat','小红书'),
-        'estimated_cost':total,'cost_currency':'RMB','cost_breakdown':cost_items,
+        'estimated_cost':float(total),'cost_currency':'RMB','cost_breakdown':cost_items,
         'created_by':user['id'],'client_id':c.get('id'),
         'owner_name':st.session_state.get('nf_owner',''),
         'invoice_project_name':f"{st.session_state.get('nf_brand','')} – {st.session_state.get('nf_posts','')} CONTENT PACKAGE",
