@@ -334,7 +334,6 @@ def page_approval():
                 st.write(f"**{p.get('brand_name','')}** — {p.get('project_code','')}")
             with col2:
                 try:
-                    import tempfile
                     stamped_path = tempfile.mktemp(suffix='.pdf')
                     _gen_stamped_only(p, stamped_path)
                     code = p.get('project_code','')
