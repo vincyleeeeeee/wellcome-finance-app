@@ -124,11 +124,34 @@ def _show_info(edit_data, client_names, cmap, user):
         st.text_input("执行周期", value=edit_data.get('execution_period',''), key="ei_period")
         st.text_input("拍摄时间", value=edit_data.get('shooting_date',''), key="ei_shoot")
         st.text_input("总篇数", value=edit_data.get('total_posts',''), key="ei_posts")
+
+        # Due date with client-specific defaults
+        def _default_due(short_name):
+            today = datetime.now()
+            if short_name == 'POP':
+                if today.month == 12: return datetime(today.year+1, 1, 5)
+                return datetime(today.year, today.month+1, 5)
+            elif short_name == 'KLT':
+                if today.day < 10: return datetime(today.year, today.month, 10)
+                elif today.day < 25: return datetime(today.year, today.month, 25)
+                else:
+                    if today.month == 12: return datetime(today.year+1, 1, 10)
+                    return datetime(today.year, today.month+1, 10)
+            return None
+
+        auto_d = _default_due(sel)
         d = edit_data.get('due_date','')
         if d and not hasattr(d,'strftime'):
             try: d = datetime.strptime(str(d)[:10],'%Y-%m-%d')
-            except: d = datetime.now()
-        st.date_input("到期日", value=d if d and hasattr(d,'strftime') else datetime.now(), key="ei_due")
+            except: d = auto_d or datetime.now()
+        default_d = d if d and hasattr(d,'strftime') else (auto_d or datetime.now())
+        st.date_input("到期日（客户付款时间）", value=default_d, key="ei_due")
+
+        due_note = ""
+        if sel == 'POP': due_note = "💡 POP 默认次月5日付款"
+        elif sel == 'KLT': due_note = "💡 KLT 每月10日或25日付款"
+        else: due_note = "💡 请与客户确认付款时间"
+        st.caption(due_note)
         st.text_input("合作内容", value=edit_data.get('content_type','') or 'UGC铺量', key="ei_content")
         st.text_input("发布平台", value=edit_data.get('platform','') or '小红书', key="ei_plat")
 
