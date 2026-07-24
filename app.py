@@ -229,29 +229,14 @@ def page_login():
 
     with tab_login:
         st.subheader("登录")
-        # Store input values in session_state to properly capture autofill
-        if 'login_email_val' not in st.session_state:
-            st.session_state['login_email_val'] = ''
-        if 'login_password_val' not in st.session_state:
-            st.session_state['login_password_val'] = ''
-
-        email = st.text_input("邮箱", placeholder="your@email.com",
-                              key="login_email_field",
-                              value=st.session_state['login_email_val'],
-                              on_change=lambda: _sync_login_input('email'))
-        password = st.text_input("密码", type="password",
-                                 key="login_password_field",
-                                 value=st.session_state['login_password_val'],
-                                 on_change=lambda: _sync_login_input('password'))
-
+        email = st.text_input("邮箱", placeholder="your@email.com")
+        password = st.text_input("密码", type="password")
         if st.button("🔐 登录", type="primary", use_container_width=True):
-            import re
-            e = st.session_state.get('login_email_val', email or '').strip()
-            p = st.session_state.get('login_password_val', password or '').strip()
-            e = re.sub(r'[^\x20-\x7E@.+\-_]', '', e)
-            user = authenticate(e, p)
+            user = authenticate(email.strip(), password.strip())
             if user is None:
                 st.error("邮箱或密码错误")
+            elif isinstance(user, dict) and '_error' in user:
+                st.error(f"服务器连接失败: {user['_error']}")
             elif user['approved'] == 0:
                 st.warning("你的账号尚未通过审核，请等待管理员审批")
             else:

@@ -85,8 +85,9 @@ def authenticate(email: str, password: str) -> Optional[Dict]:
             "password_hash", _hash_password(password)
         ).execute()
         return result.data[0] if result.data else None
-    except Exception:
-        return None
+    except Exception as e:
+        # Return the error so the app can display it
+        return {"_error": str(e)}
 
 
 def is_approved(user_id: int) -> bool:
