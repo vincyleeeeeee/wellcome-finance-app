@@ -64,24 +64,35 @@ if "page" not in st.session_state:
 # Simplified: store user_id in session_state, which persists within a browser session
 
 def _save_session(user_id):
-    """Store login in session state (works within one browser session)."""
+    """Store login in session state and query params for persistence."""
     st.session_state['_logged_in_user_id'] = user_id
+    st.session_state['_last_active'] = datetime.now().isoformat()
 
 def _restore_session():
     """Try to restore user from session state."""
     uid = st.session_state.get('_logged_in_user_id')
-    if uid:
+    last = st.session_state.get('_last_active')
+    if uid and last:
+        # Session valid for 7 days of inactivity
         try:
-            result = get_connection().table("users").select("*").eq("id", uid).execute()
-            if result.data:
-                return result.data[0]
+            last_dt = datetime.fromisoformat(last)
+            if (datetime.now() - last_dt).days < 7:
+                result = get_connection().table("users").select("*").eq("id", uid).execute()
+                if result.data:
+                    return result.data[0]
         except:
             pass
     return None
 
+def _heartbeat():
+    """Keep session alive on every interaction."""
+    if st.session_state.get('_logged_in_user_id'):
+        st.session_state['_last_active'] = datetime.now().isoformat()
+
 def _clear_session():
-    if '_logged_in_user_id' in st.session_state:
-        del st.session_state['_logged_in_user_id']
+    for k in ['_logged_in_user_id', '_last_active']:
+        if k in st.session_state:
+            del st.session_state[k]
 
 
 def logout():
@@ -94,6 +105,7 @@ def logout():
 # Sidebar navigation (when logged in)
 # ============================================================
 def render_sidebar():
+    _heartbeat()
     user = st.session_state.user
     role_labels = {'admin': '🔑 管理员', 'finance': '💰 财务', 'user': '👤 用户'}
     with st.sidebar:
