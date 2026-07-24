@@ -242,6 +242,8 @@ def page_approval():
                         st.caption(f"预估成本: RMB {p.get('estimated_cost',0):,.0f}"+(f"（{cd}）" if cd else ""))
                     st.caption(f"提交: {(p.get('created_at','') or '')[:10]}")
                 with col_btn:
+                    with st.expander("📄 预览Invoice", expanded=True):
+                        _show_invoice_preview(p)
                     _gen_invoice_dl(p)
                     if st.button("✅ 通过", key=f"ok_{p['id']}", use_container_width=True, type="primary"):
                         with st.spinner("生成盖章PDF..."):
@@ -280,6 +282,26 @@ def page_approval():
                     st.caption("重新生成失败")
     else:
         st.info("暂无已通过的项目")
+
+
+def _show_invoice_preview(p):
+    """Show a preview of invoice content inline."""
+    client = get_client_by_id(p.get('client_id')) or {}
+    cur = p.get('currency','USD')
+    amt = p.get('amount',0)
+
+    st.markdown(f"""
+    <div style="border:1px solid #ddd;border-radius:8px;padding:12px;margin:8px 0;background:#fafafa">
+    <b>📄 Invoice 预览</b><br>
+    <table style="width:100%;font-size:13px;border-collapse:collapse">
+    <tr><td style="padding:3px 8px;color:#888">项目</td><td>{p.get('project_name','')}</td></tr>
+    <tr><td style="padding:3px 8px;color:#888">编号</td><td>{p.get('project_code','')}</td></tr>
+    <tr><td style="padding:3px 8px;color:#888">客户</td><td>{client.get('full_name','')}</td></tr>
+    <tr><td style="padding:3px 8px;color:#888">金额</td><td><b>{cur} {amt:,.2f}</b></td></tr>
+    <tr><td style="padding:3px 8px;color:#888">到期日</td><td>{str(p.get('due_date',''))[:10]}</td></tr>
+    </table>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 def _gen_invoice_dl(p):
