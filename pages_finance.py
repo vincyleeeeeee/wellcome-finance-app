@@ -147,7 +147,8 @@ def _render_table(projects):
                 rows_html += f"<td style='text-align:right'>{item.get('currency','RMB')} {item.get('amount',0):,.0f}</td>"
                 if idx == 0:
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>RMB {total_cost:,.0f}</td>"
-                rows_html += f"<td style='text-align:center'>{feishu}</td>"
+                if idx == 0:
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{feishu}</td>"
                 if idx == 0:
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{paid}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{closure}</td>"
