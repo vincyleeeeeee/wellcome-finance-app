@@ -54,8 +54,8 @@ def _quick_create(client_names, cmap, user):
             qc_month = st.selectbox("编号月份", list(range(1,13)), index=datetime.now().month-1,
                                     format_func=lambda m:f"{m}月", key="qc_month")
             code = get_next_code_for_month(datetime.now().year, qc_month)
+            st.success(f"📝 {qc_month}月下一个可用编号：**{code}**")
             st.text_input("项目编号", value=code, key="qc_code")
-            st.caption("💡 自动生成，可直接修改")
             st.text_input("项目名称 *", key="qc_name")
             st.text_input("品牌名 *", key="qc_brand")
         with col2:
@@ -105,12 +105,14 @@ def _show_info(edit_data, client_names, cmap, user):
         cm = st.selectbox("编号月份", list(range(1,13)),
                           index=datetime.now().month-1,
                           format_func=lambda m:f"{m}月", key="ei_month")
-        default_code = edit_data.get('project_code','')
-        if not default_code:
-            try: default_code = get_next_code_for_month(datetime.now().year, cm)
-            except: pass
+        next_code = get_next_code_for_month(datetime.now().year, cm)
+        if edit_data.get('project_code'):
+            default_code = edit_data['project_code']
+            st.success(f"📝 {cm}月下一个可用编号：**{next_code}**（当前使用：{default_code}）")
+        else:
+            default_code = next_code
+            st.success(f"📝 {cm}月下一个可用编号：**{next_code}**")
         st.text_input("项目编号", value=default_code, key="ei_code")
-        st.caption(f"💡 自动生成，可直接修改。{cm}月当前下一个编号已显示。")
         st.text_input("项目名称", value=edit_data.get('project_name',''), key="ei_name")
         st.text_input("品牌名", value=edit_data.get('brand_name',''), key="ei_brand")
         ci = 0 if edit_data.get('currency','USD')=='USD' else 1
@@ -205,21 +207,29 @@ def _stage_actions(edit_data, user):
 
 def _act_confirmation(ed, user):
     st.write("📄 生成确认函，发给客户盖章")
-    if st.button("📄 生成确认函", type="primary", use_container_width=True):
-        client = get_client_by_id(ed.get('client_id')) or {}
-        proj = {'project_code':ed.get('project_code',''),'project_name':ed.get('project_name',''),
-                'brand_name':ed.get('brand_name',''),'venue':ed.get('venue',''),
-                'execution_period':ed.get('execution_period',''),'shooting_date':ed.get('shooting_date',''),
-                'total_posts':ed.get('total_posts',''),'amount':ed.get('amount',0),
-                'application_date':datetime.now().strftime('%b %d, %Y')}
-        path = generate_confirmation_letter({'full_name':client.get('full_name',''),'contact':client.get('contact','')}, proj)
-        get_connection().table("projects").update({"status":"confirmation_sent"}).eq("id",ed['id']).execute()
-        with open(path,'rb') as f:
-            st.download_button("📥 下载确认函", f, file_name=f"{ed.get('brand_name','')}-confirmation-letter.docx", key="dlcf4")
-        subj,body = generate_email_confirmation(proj)
-        with st.expander("📧 邮件"):
-            st.text_input("主题", value=subj); st.text_area("正文", value=body, height=120)
-        st.success("已生成！请发给客户盖章。"); st.rerun()
+
+    col_gen, col_skip = st.columns(2)
+    with col_gen:
+        if st.button("📄 生成确认函", type="primary", use_container_width=True):
+            client = get_client_by_id(ed.get('client_id')) or {}
+            proj = {'project_code':ed.get('project_code',''),'project_name':ed.get('project_name',''),
+                    'brand_name':ed.get('brand_name',''),'venue':ed.get('venue',''),
+                    'execution_period':ed.get('execution_period',''),'shooting_date':ed.get('shooting_date',''),
+                    'total_posts':ed.get('total_posts',''),'amount':ed.get('amount',0),
+                    'application_date':datetime.now().strftime('%b %d, %Y')}
+            path = generate_confirmation_letter({'full_name':client.get('full_name',''),'contact':client.get('contact','')}, proj)
+            get_connection().table("projects").update({"status":"confirmation_sent"}).eq("id",ed['id']).execute()
+            with open(path,'rb') as f:
+                st.download_button("📥 下载确认函", f, file_name=f"{ed.get('brand_name','')}-confirmation-letter.docx", key="dlcf4")
+            subj,body = generate_email_confirmation(proj)
+            with st.expander("📧 邮件"):
+                st.text_input("主题", value=subj); st.text_area("正文", value=body, height=120)
+            st.success("已生成！请发给客户盖章。"); st.rerun()
+    with col_skip:
+        if st.button("⏭️ 跳过（客户自回传）", use_container_width=True,
+                     help="POP等客户会自己回传确认函，无需我们生成"):
+            get_connection().table("projects").update({"status":"confirmation_sent"}).eq("id",ed['id']).execute()
+            st.success("已跳过，直接进入上传确认函阶段。"); st.rerun()
 
 
 def _act_upload(ed, user):
