@@ -289,35 +289,41 @@ def _show_info_fields(edit_data, client_names, cmap, user):
     if tr>0: st.info(f"总成本(RMB): ¥{tr:,.0f}")
 
     if st.button("💾 保存信息", type="primary", use_container_width=True):
-        _save_info(edit_data, client_names, cmap, user)
-        st.rerun()
+        ok = _save_info(edit_data, client_names, cmap, user)
+        if ok:
+            st.success("✅ 信息已保存！点「下一步」推进到下一阶段")
 
 
 def _save_info(edit_data, client_names, cmap, user):
-    import json as _j
-    sel = st.session_state.get('nf_sel','')
-    c = cmap.get(sel,{})
-    cost_items = _j.dumps(_collect_cost(), ensure_ascii=False)
-    total = sum(i['amount']*{"USD":7.2,"RMB":1.0,"THB":0.2,"MYR":1.55}.get(i['currency'],1) for i in (_collect_cost() or []))
-    due_d = st.session_state.get('nf_due_date')
-    if hasattr(due_d, 'strftime'): due_d = due_d.strftime('%Y-%m-%d')
-    data = {
-        'client_short':sel,'project_code':st.session_state.get('nf_code',''),
-        'project_name':st.session_state.get('nf_name',''),'brand_name':st.session_state.get('nf_brand',''),
-        'amount':float(st.session_state.get('nf_amt',0) or 0),'currency':st.session_state.get('nf_cur','USD'),
-        'venue':st.session_state.get('nf_venue',''),'execution_period':st.session_state.get('nf_period',''),
-        'shooting_date':st.session_state.get('nf_shoot',''),'total_posts':st.session_state.get('nf_posts',''),
-        'invoice_date':str(datetime.now().date()),'due_date':str(due_d or ''),
-        'content_type':st.session_state.get('nf_content','UGC铺量'),'platform':st.session_state.get('nf_plat','小红书'),
-        'estimated_cost':float(total),'cost_currency':'RMB','cost_breakdown':cost_items,
-        'created_by':user['id'],'client_id':c.get('id'),
-        'owner_name':st.session_state.get('nf_owner',''),
-        'invoice_project_name':f"{st.session_state.get('nf_brand','')} – {st.session_state.get('nf_posts','')} CONTENT PACKAGE",
-    }
-    if edit_data:
-        get_connection().table("projects").update(data).eq("id",edit_data['id']).execute()
-    else:
-        data['status']='draft'; save_project(data)
+    try:
+        import json as _j
+        sel = st.session_state.get('nf_sel','')
+        c = cmap.get(sel,{})
+        cost_items = _j.dumps(_collect_cost(), ensure_ascii=False)
+        total = sum(i['amount']*{"USD":7.2,"RMB":1.0,"THB":0.2,"MYR":1.55}.get(i['currency'],1) for i in (_collect_cost() or []))
+        due_d = st.session_state.get('nf_due_date')
+        if hasattr(due_d, 'strftime'): due_d = due_d.strftime('%Y-%m-%d')
+        data = {
+            'client_short':sel,'project_code':st.session_state.get('nf_code',''),
+            'project_name':st.session_state.get('nf_name',''),'brand_name':st.session_state.get('nf_brand',''),
+            'amount':float(st.session_state.get('nf_amt',0) or 0),'currency':st.session_state.get('nf_cur','USD'),
+            'venue':st.session_state.get('nf_venue',''),'execution_period':st.session_state.get('nf_period',''),
+            'shooting_date':st.session_state.get('nf_shoot',''),'total_posts':st.session_state.get('nf_posts',''),
+            'invoice_date':str(datetime.now().date()),'due_date':str(due_d or ''),
+            'content_type':st.session_state.get('nf_content','UGC铺量'),'platform':st.session_state.get('nf_plat','小红书'),
+            'estimated_cost':float(total),'cost_currency':'RMB','cost_breakdown':cost_items,
+            'created_by':user['id'],'client_id':c.get('id'),
+            'owner_name':st.session_state.get('nf_owner',''),
+            'invoice_project_name':f"{st.session_state.get('nf_brand','')} – {st.session_state.get('nf_posts','')} CONTENT PACKAGE",
+        }
+        if edit_data:
+            get_connection().table("projects").update(data).eq("id",edit_data['id']).execute()
+        else:
+            data['status']='draft'; save_project(data)
+        return True
+    except Exception as e:
+        st.error(f"保存失败: {e}")
+        return False
 
 
 def _collect_cost():
