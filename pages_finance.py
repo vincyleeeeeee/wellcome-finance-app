@@ -195,32 +195,33 @@ def page_approval():
     """Simple approval page."""
     st.title("⏳ 待审核")
     pending = get_pending_approvals()
-    if not pending: st.success("✅ 没有需要审核的项目"); return
-    st.subheader(f"共 {len(pending)} 个项目等你审核")
     user=st.session_state.user
 
-    for p in pending:
-        with st.container(border=True):
-            st.markdown(f"### {p.get('brand_name','')} — {p.get('project_name','')}")
-            feishu_badge = "✅ 飞书已立项" if p.get('feishu_approved') else "⚠️ 未确认飞书立项"
-            col_info,col_btn=st.columns([3,2])
-            with col_info:
-                st.write(f"**{p.get('client_short','')}** | {p.get('currency','USD')} **{p.get('amount',0):,.2f}** | {feishu_badge}")
-                if p.get('estimated_cost'):
-                    cd=_fmt_cost_line(p.get('cost_breakdown','') or '')
-                    st.caption(f"预估成本: RMB {p.get('estimated_cost',0):,.0f}"+(f"（{cd}）" if cd else ""))
-                st.caption(f"提交: {(p.get('created_at','') or '')[:10]}")
-
-            with col_btn:
-                _gen_invoice_dl(p)
-                if st.button("✅ 通过", key=f"ok_{p['id']}", use_container_width=True, type="primary"):
-                    with st.spinner("生成盖章PDF..."):
-                        try:
-                            _regen_and_approve(p, user['id'])
-                            st.success("已通过！"); st.rerun()
-                        except Exception as e: st.error(f"失败: {e}")
-                if st.button("❌ 驳回", key=f"no_{p['id']}", use_container_width=True):
-                    reject_project(p['id'], user['id']); st.warning("已驳回"); st.rerun()
+    if pending:
+        st.subheader(f"共 {len(pending)} 个项目等你审核")
+        for p in pending:
+            with st.container(border=True):
+                st.markdown(f"### {p.get('brand_name','')} — {p.get('project_name','')}")
+                feishu_badge = "✅ 飞书已立项" if p.get('feishu_approved') else "⚠️ 未确认飞书立项"
+                col_info,col_btn=st.columns([3,2])
+                with col_info:
+                    st.write(f"**{p.get('client_short','')}** | {p.get('currency','USD')} **{p.get('amount',0):,.2f}** | {feishu_badge}")
+                    if p.get('estimated_cost'):
+                        cd=_fmt_cost_line(p.get('cost_breakdown','') or '')
+                        st.caption(f"预估成本: RMB {p.get('estimated_cost',0):,.0f}"+(f"（{cd}）" if cd else ""))
+                    st.caption(f"提交: {(p.get('created_at','') or '')[:10]}")
+                with col_btn:
+                    _gen_invoice_dl(p)
+                    if st.button("✅ 通过", key=f"ok_{p['id']}", use_container_width=True, type="primary"):
+                        with st.spinner("生成盖章PDF..."):
+                            try:
+                                _regen_and_approve(p, user['id'])
+                                st.success("已通过！"); st.rerun()
+                            except Exception as e: st.error(f"失败: {e}")
+                    if st.button("❌ 驳回", key=f"no_{p['id']}", use_container_width=True):
+                        reject_project(p['id'], user['id']); st.warning("已驳回"); st.rerun()
+    else:
+        st.success("✅ 没有需要审核的项目")
 
     # Recently approved projects with stamped PDF download
     all_p = get_projects(limit=100)
