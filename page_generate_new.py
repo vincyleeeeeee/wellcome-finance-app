@@ -269,7 +269,7 @@ def _show_info_fields(edit_data, client_names, cmap, user):
                 if a and a>0: tr+=a*R.get(cu,1); items.append({"name":cat,"amount":a,"currency":cu})
     # Dynamic custom cost items
     if 'custom_cost_count' not in st.session_state:
-        st.session_state['custom_cost_count'] = 1
+        st.session_state['custom_cost_count'] = 0
     for i in range(st.session_state['custom_cost_count']):
         cc1,cc2,cc3 = st.columns([2,2,1])
         with cc1:
