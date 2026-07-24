@@ -67,9 +67,13 @@ def page_generate():
     client_names = [c['short_name'] for c in clients]
     cmap = {c['short_name']: c for c in clients}
 
+    # Always show info form (editable)
+    _show_info_section(edit_data, clients, client_names, cmap, user)
+    st.divider()
+
     # Stage-specific actions
     if stage_idx == 0:
-        _stage_info(edit_data, clients, client_names, cmap, user)
+        pass  # info already shown above
     elif stage_idx == 1:
         _stage_confirmation(edit_data, user)
     elif stage_idx == 2:
@@ -79,8 +83,6 @@ def page_generate():
     elif stage_idx == 4:
         _stage_receipt(edit_data, user)
 
-    st.divider()
-    _form_compact(edit_data, clients, client_names, cmap, user)
 
 
 def _stage_info(edit_data, clients, client_names, cmap, user):
@@ -215,10 +217,10 @@ def _stage_receipt(edit_data, user):
         st.info("请等待财务审核通过")
 
 
-def _form_compact(edit_data, clients, client_names, cmap, user):
+def _show_info_section(edit_data, clients, client_names, cmap, user):
     if not edit_data: return
-    with st.expander("✏️ 编辑基本信息", expanded=True):
-        _show_info_fields(edit_data, client_names, cmap, user)
+    st.subheader("📝 项目基本信息")
+    _show_info_fields(edit_data, client_names, cmap, user)
 
 
 def _show_info_fields(edit_data, client_names, cmap, user):
