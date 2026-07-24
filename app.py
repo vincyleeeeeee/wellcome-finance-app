@@ -1028,6 +1028,7 @@ def _receipt_form(client, project):
                 )
                 st.success("✅ 收据已生成！")
                 st.session_state['receipt_stamped'] = stamped_name
+                st.session_state['receipt_brand'] = receipt_data.get('brand_name', 'receipt')
                 st.rerun()
             except Exception as e:
                 st.error(f"PDF 生成失败: {e}")
@@ -1039,7 +1040,8 @@ def _receipt_form(client, project):
             col_a, col_b = st.columns(2)
             with col_a:
                 with open(path, "rb") as f:
-                    st.download_button("📥 下载盖章收据 PDF", f, file_name=os.path.basename(path), use_container_width=True)
+                    fname = f"{st.session_state.get('receipt_brand','receipt')}-cash-receipt.pdf"
+                    st.download_button("📥 下载盖章收据 PDF", f, file_name=fname, use_container_width=True)
             with col_b:
                 if st.session_state.get('receipt_xlsx'):
                     st.download_button("📥 下载收据 Excel", st.session_state['receipt_xlsx'],

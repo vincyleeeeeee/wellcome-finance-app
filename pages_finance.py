@@ -214,26 +214,31 @@ def page_approval():
 
     # Recently approved projects with stamped PDF download
     all_p = get_projects(limit=50)
-    approved = [p for p in all_p if p.get('status')=='approved' and p.get('stamped_pdf_path')]
+    approved = [p for p in all_p if p.get('status')=='approved']
     if approved:
         st.divider()
-        st.subheader("✅ 已通过项目（盖章PDF可下载）")
+        st.subheader("✅ 已通过项目（可下载盖章PDF）")
         for p in approved[:10]:
             col1, col2 = st.columns([3,1])
             with col1:
                 st.write(f"**{p.get('brand_name','')}** — {p.get('project_code','')} — {(p.get('approved_at','') or '')[:10]}")
             with col2:
                 try:
-                    _regen_and_approve(p, None)  # regenerate stamped PDF
-                    # The stamped path was updated in DB, but we need to serve it
-                    # Actually just regenerate and download
                     import tempfile
                     stamped_path = tempfile.mktemp(suffix='.pdf')
                     _gen_stamped_only(p, stamped_path)
+                    # Figure out month from project code: WELL2607xx → 7月
+                    code = p.get('project_code','')
+                    month_str = code[4:6] if len(code)>=6 else ''
+                    month_name = f"{int(month_str)}月" if month_str.isdigit() else month_str
+                    fname = f"{p.get('brand_name','')}-{month_name}-invoice.pdf"
                     with open(stamped_path, 'rb') as f:
-                        st.download_button("📥 盖章PDF", f, file_name=f"{p.get('brand_name','')}-stamped-invoice.pdf",
+                        st.download_button("📥 盖章PDF", f, file_name=fname,
                                           key=f"stamped_{p['id']}", use_container_width=True)
-                except: pass
+                    try: os.unlink(stamped_path)
+                    except: pass
+                except Exception as e:
+                    st.caption(f"生成失败")
 
 
 def _gen_invoice_dl(p):
