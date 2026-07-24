@@ -101,9 +101,15 @@ def _stage_stamped(edit_data, user):
         get_connection().table("projects").update({"stamped_confirmation":b64,"status":"stamped_uploaded"}).eq("id",uid).execute()
         st.success("✅ 已上传！"); st.rerun()
     if edit_data.get('stamped_confirmation'):
-        st.success("已有盖章确认函")
-        try: st.image(base64.b64decode(edit_data['stamped_confirmation']))
-        except: pass
+        st.success("✅ 已上传盖章确认函")
+        # Show image preview if it's an image, otherwise download button
+        try:
+            st.image(base64.b64decode(edit_data['stamped_confirmation']))
+        except:
+            st.download_button("📥 下载查看盖章确认函",
+                              base64.b64decode(edit_data['stamped_confirmation']),
+                              file_name="盖章确认函.pdf",
+                              mime="application/pdf")
 
 
 def _stage_invoice(edit_data, user):
