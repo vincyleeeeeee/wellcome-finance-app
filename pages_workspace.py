@@ -82,11 +82,20 @@ def page_workspace():
                 mn = M.get(ms,'')
 
                 with st.expander("📥 下载文件", expanded=False):
-                    # Confirmation letter (if generated)
+                    # Confirmation letter download
                     if p.get('status') in ('confirmation_sent','stamped_uploaded','pending','approved'):
-                        # Regenerate confirmation letter for download
-                        pass  # We don't store the path, need to regenerate
-                        st.caption("确认函：去「📄 生成文档」生成")
+                        from utils.generate import generate_confirmation_letter
+                        client = get_client_by_id(p.get('client_id')) or {}
+                        proj = {'project_code':p.get('project_code',''),'project_name':p.get('project_name',''),
+                                'brand_name':p.get('brand_name',''),'amount':p.get('amount',0),
+                                'application_date':datetime.now().strftime('%b %d, %Y')}
+                        import tempfile, os as _os
+                        tmp = tempfile.mktemp(suffix='.docx')
+                        path = generate_confirmation_letter({'full_name':client.get('full_name',''),'contact':client.get('contact','')}, proj)
+                        with open(path,'rb') as f:
+                            st.download_button("📄 确认函(Word)", f,
+                                              file_name=f"{p.get('brand_name','')}-confirmation-letter.docx",
+                                              key=f"ws_cf_{pid}", use_container_width=True)
 
                     # Stamped confirmation (if uploaded)
                     if p.get('stamped_confirmation'):
@@ -107,7 +116,13 @@ def page_workspace():
 
                     # Receipt (if paid)
                     if p.get('payment_received'):
-                        st.caption("🧾 收据：去「🧾 开收据」生成")
+                        if p.get('receipt_stamped_path') and os.path.exists(p['receipt_stamped_path']):
+                            with open(p['receipt_stamped_path'], 'rb') as f:
+                                st.download_button("🧾 盖章收据", f,
+                                                  file_name=f"{p.get('brand_name','')}-cash-receipt.pdf",
+                                                  key=f"ws_rc_{pid}", use_container_width=True)
+                        else:
+                            st.caption("🧾 去「🧾 开收据」生成盖章收据")
 
                 # Email templates
                 with st.expander("📧 邮件文案", expanded=False):
