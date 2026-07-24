@@ -137,14 +137,54 @@ def _stage_stamped(edit_data, user):
 
 def _stage_invoice(edit_data, user):
     st.subheader("🧾 申请开发票")
-    if not edit_data:
-        st.warning("请先完成前面阶段"); return
+    if not edit_data: st.warning("请先完成前面阶段"); return
+
+    # Check prerequisites
+    errors = []
     if not edit_data.get('stamped_confirmation'):
-        st.error("⚠️ 请先在「📎 客户盖章确认函」阶段上传"); return
+        errors.append("❌ 尚未上传客户盖章确认函（请回「📎 客户盖章确认函」阶段上传）")
+    if not edit_data.get('estimated_cost') or edit_data.get('estimated_cost') == 0:
+        errors.append("❌ 成本构成为空（请编辑基本信息添加成本细项）")
+
+    if errors:
+        for e in errors: st.error(e)
+        return
+
+    # === Review card ===
+    st.success("✅ 所有前置条件已满足，请确认以下信息：")
+    client = get_client_by_id(edit_data.get('client_id')) or {}
+
+    with st.container(border=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.write(f"**项目**：{edit_data.get('project_name','')}")
+            st.write(f"**品牌**：{edit_data.get('brand_name','')}")
+            st.write(f"**编号**：{edit_data.get('project_code','')}")
+            st.write(f"**客户**：{client.get('full_name','')}")
+        with c2:
+            st.write(f"**金额**：{edit_data.get('currency','USD')} {edit_data.get('amount',0):,.2f}")
+            st.write(f"**总成本(RMB)**：¥{edit_data.get('estimated_cost',0):,.0f}")
+            st.write(f"**执行周期**：{edit_data.get('execution_period','')}")
+            st.write(f"**到期日**：{str(edit_data.get('due_date',''))[:10]}")
+        # Cost breakdown
+        try:
+            import json as _j
+            ci = _j.loads(edit_data.get('cost_breakdown','') or '[]')
+            if ci:
+                cost_str = "、".join(f"{i['name']}({i.get('currency','RMB')}{i.get('amount',0):,.0f})" for i in ci)
+                st.caption(f"**成本构成**：{cost_str}")
+        except: pass
+
+    # Stamped confirmation
+    with st.expander("📎 查看盖章确认函"):
+        try: st.image(base64.b64decode(edit_data['stamped_confirmation']))
+        except: st.download_button("📥 下载确认函", base64.b64decode(edit_data['stamped_confirmation']),
+                                  file_name="盖章确认函.pdf")
+
+    st.divider()
     f_ok = st.checkbox("已在飞书立项", value=edit_data.get('feishu_approved',False))
-    subm = st.checkbox("生成后提交财务审核", value=True)
-    if st.button("🧾 生成发票并提交审核", type="primary", use_container_width=True):
-        client = get_client_by_id(edit_data.get('client_id')) or {}
+    if st.button("📤 确认无误，提交财务审核", type="primary", use_container_width=True):
+        # Regenerate invoice
         inv_path = generate_invoice(client, {
             'client_short':edit_data.get('client_short',client.get('short_name','')),
             'project_code':edit_data.get('project_code',''),'project_name':edit_data.get('project_name',''),
@@ -157,12 +197,12 @@ def _stage_invoice(edit_data, user):
             'invoice_project_name':f"{edit_data.get('brand_name','')} – {edit_data.get('total_posts','')} CONTENT PACKAGE",
         })
         get_connection().table("projects").update({
-            "feishu_approved":f_ok, "status":"pending" if subm else "stamped_uploaded"
+            "feishu_approved":f_ok, "status":"pending"
         }).eq("id",edit_data['id']).execute()
         with open(inv_path,'rb') as f:
-            st.download_button("📥 下载Invoice", f, file_name=f"{edit_data.get('brand_name','')}-invoice.xlsx")
-        st.success("✅ 已生成！" if not subm else "✅ 已提交财务审核！")
-        st.rerun()
+            st.download_button("📥 下载发票(未盖章)", f, file_name=f"{edit_data.get('brand_name','')}-invoice.xlsx")
+        st.success("✅ 已提交财务审核！财务通过后可下载盖章发票。")
+        st.balloons()
 
 
 def _stage_receipt(edit_data, user):
