@@ -88,6 +88,9 @@ def page_workspace():
                         client = get_client_by_id(p.get('client_id')) or {}
                         proj = {'project_code':p.get('project_code',''),'project_name':p.get('project_name',''),
                                 'brand_name':p.get('brand_name',''),'amount':p.get('amount',0),
+                                'client_short':p.get('client_short',client.get('short_name','')),
+                                'total_posts':p.get('total_posts',''),'venue':p.get('venue',''),
+                                'execution_period':p.get('execution_period',''),'shooting_date':p.get('shooting_date',''),
                                 'application_date':datetime.now().strftime('%b %d, %Y')}
                         import tempfile, os as _os
                         tmp = tempfile.mktemp(suffix='.docx')
