@@ -61,7 +61,17 @@ def _quick_create(client_names, cmap, user):
         with col2:
             cur = st.selectbox("币种", ["USD","RMB"], key="qc_cur")
             st.number_input("金额 *", min_value=0.0, step=100.0, value=None, key="qc_amt")
-            st.date_input("到期日", value=datetime.now(), key="qc_due")
+            # Auto due date by client
+            qc_due_default = datetime.now()
+            today = datetime.now()
+            if sel == 'POP':
+                qc_due_default = datetime(today.year, today.month+1, 5) if today.month < 12 else datetime(today.year+1, 1, 5)
+            elif sel == 'KLT':
+                qc_due_default = datetime(today.year, today.month, 10 if today.day<10 else 25) if today.day<25 else datetime(today.year, today.month+1, 10)
+            st.date_input("到期日（客户付款时间）", value=qc_due_default, key="qc_due")
+            if sel == 'POP': st.caption("💡 POP 默认次月5日付款")
+            elif sel == 'KLT': st.caption("💡 KLT 每月10日或25日付款")
+            else: st.caption("💡 请与客户确认付款时间")
         if st.button("💾 创建项目", type="primary", use_container_width=True):
             data = {
                 'project_code': st.session_state.get('qc_code',''),
