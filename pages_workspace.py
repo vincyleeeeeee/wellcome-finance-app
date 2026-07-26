@@ -108,24 +108,47 @@ def page_workspace():
                                           file_name=f"{p.get('brand_name','')}-盖章确认函.pdf",
                                           key=f"ws_sc_{pid}", use_container_width=True)
 
-                    # Stamped invoice
+                    # Stamped invoice - regenerate on demand
                     if p.get('status') == 'approved':
-                        stamped = p.get('stamped_pdf_path','')
-                        if stamped and os.path.exists(stamped):
-                            with open(stamped, 'rb') as f:
-                                st.download_button("📥 盖章Invoice",
-                                                  f, file_name=f"{p.get('brand_name','')}-{mn}-invoice.pdf",
+                        from pages_finance import _gen_stamped_only
+                        import tempfile, os as _os
+                        tmp = tempfile.mktemp(suffix='.pdf')
+                        try:
+                            _gen_stamped_only(p, tmp)
+                            with open(tmp, 'rb') as f:
+                                st.download_button("📥 盖章Invoice", f,
+                                                  file_name=f"{p.get('brand_name','')}-{mn}-invoice.pdf",
                                                   key=f"ws_inv_{pid}", use_container_width=True)
+                        except: pass
+                        try: _os.unlink(tmp)
+                        except: pass
 
                     # Receipt (if paid)
                     if p.get('payment_received'):
-                        if p.get('receipt_stamped_path') and os.path.exists(p['receipt_stamped_path']):
-                            with open(p['receipt_stamped_path'], 'rb') as f:
+                        from utils.receipt_pdf import generate_receipt_pdf
+                        import tempfile, os as _os2
+                        client2 = get_client_by_id(p.get('client_id')) or {}
+                        rd = {'project_name':p.get('project_name',''),'project_code':p.get('project_code',''),
+                              'brand_name':p.get('brand_name',''),'amount':p.get('amount',0),
+                              'currency':p.get('currency','USD'),'venue':p.get('venue',''),
+                              'payment_amount':p.get('amount',0),'payment_date':datetime.now(),
+                              'gained_date':datetime.now(),'payment_method':'BANK',
+                              'issuer_name':'Mr. Terry.Su','project_date':p.get('execution_period',''),
+                              'client_short':p.get('client_short','')}
+                        tmp2 = tempfile.mktemp(suffix='.pdf')
+                        try:
+                            generate_receipt_pdf({'full_name':client2.get('full_name',''),
+                                                'address':client2.get('address',''),
+                                                'contact':client2.get('contact',''),
+                                                'phone':client2.get('phone',''),
+                                                'email':client2.get('email','')}, rd, tmp2)
+                            with open(tmp2, 'rb') as f:
                                 st.download_button("🧾 盖章收据", f,
                                                   file_name=f"{p.get('brand_name','')}-cash-receipt.pdf",
                                                   key=f"ws_rc_{pid}", use_container_width=True)
-                        else:
-                            st.caption("🧾 去「🧾 开收据」生成盖章收据")
+                        except: pass
+                        try: _os2.unlink(tmp2)
+                        except: pass
 
                 # Email templates
                 with st.expander("📧 邮件文案", expanded=False):

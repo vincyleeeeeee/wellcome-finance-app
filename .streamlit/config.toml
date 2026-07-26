@@ -1,5 +1,5 @@
-[global]
-developmentMode = false
+[browser]
+gatherUsageStats = false
 
-[server]
-runOnSave = false
+[client]
+toolbarMode = "viewer"
