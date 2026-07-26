@@ -107,7 +107,6 @@ def page_overview():
 
 
 def _render_table(projects):
-    """Render HTML table with merged cells for same-project rows."""
     rows_html = ""
     for p in projects:
         stage = STAGE_MAP.get(p.get('status', ''), p.get('status', '?'))
@@ -117,15 +116,10 @@ def _render_table(projects):
         total_cost = p.get('estimated_cost',0) or 0
         exec_period = p.get('execution_period','') or ''
         exp_pay = str(p.get('expected_payment_date','') or '')[:10]
-        # Extract year-month: handle both formats
-        # WELL260801001 (13 chars) or WELL20260717012 (15 chars)
         code = p.get('project_code','')
-        if len(code) >= 15:  # old format WELL20260717012
-            year_month = f"{code[4:8]}-{code[8:10]}"
-        elif len(code) >= 8:  # new format WELL260801001
-            year_month = f"20{code[4:6]}-{code[6:8]}"
-        else:
-            year_month = ''
+        if len(code) >= 15: year_month = f"{code[4:8]}-{code[8:10]}"
+        elif len(code) >= 8: year_month = f"20{code[4:6]}-{code[6:8]}"
+        else: year_month = ''
 
         try: cost_items = json.loads(p.get('cost_breakdown','') or '[]')
         except: cost_items = []
@@ -135,11 +129,11 @@ def _render_table(projects):
             for idx, item in enumerate(cost_items):
                 rows_html += "<tr>"
                 if idx == 0:
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{stage}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{year_month}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{code}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('brand_name','')}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('id','')}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('client_short','')}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{(p.get('project_name','') or '')[:35]}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{code}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{exec_period}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{exp_pay}</td>"
@@ -147,19 +141,18 @@ def _render_table(projects):
                 rows_html += f"<td style='text-align:right'>{item.get('amount',0):,.0f}</td>"
                 if idx == 0:
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{total_cost:,.0f}</td>"
-                if idx == 0:
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{feishu}</td>"
-                if idx == 0:
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{paid}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{closure}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{stage}</td>"
                 rows_html += "</tr>"
         else:
             rows_html += "<tr>"
-            rows_html += f"<td style='text-align:center'>{stage}</td>"
-            rows_html += f"<td style='text-align:center'>{year_month}</td>"
-            rows_html += f"<td style='text-align:center'>{code}</td>"
-            rows_html += f"<td style='text-align:center'>{p.get('brand_name','')}</td>"
+            rows_html += f"<td style='text-align:center'>{p.get('id','')}</td>"
             rows_html += f"<td style='text-align:center'>{p.get('client_short','')}</td>"
+            rows_html += f"<td style='text-align:center'>{(p.get('project_name','') or '')[:35]}</td>"
+            rows_html += f"<td style='text-align:center'>{code}</td>"
+            rows_html += f"<td style='text-align:center'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
             rows_html += f"<td style='text-align:center'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
             rows_html += f"<td style='text-align:center'>{exec_period}</td>"
             rows_html += f"<td style='text-align:center'>{exp_pay}</td>"
@@ -168,6 +161,7 @@ def _render_table(projects):
             rows_html += f"<td style='text-align:center'>{feishu}</td>"
             rows_html += f"<td style='text-align:center'>{paid}</td>"
             rows_html += f"<td style='text-align:center'>{closure}</td>"
+            rows_html += f"<td style='text-align:center'>{stage}</td>"
             rows_html += "</tr>"
 
     html = f"""
@@ -185,6 +179,7 @@ def _render_table(projects):
     </table>
     """
     st.markdown(html, unsafe_allow_html=True)
+
 
     # Quick action: mark as paid for approved but unpaid projects
     st.divider()
