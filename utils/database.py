@@ -7,13 +7,6 @@ from typing import Optional, Tuple, List, Dict, Any
 
 from supabase import create_client
 
-# Try to use Streamlit cache if available
-try:
-    import streamlit as st
-    _has_st = True
-except ImportError:
-    _has_st = False
-
 _supabase = None
 
 
@@ -138,15 +131,7 @@ def get_connection():
 # ============================================================
 # Client operations
 # ============================================================
-def get_clients(ttl: int = 300) -> List[Dict]:
-    """Get clients. Cached for 5 min on Streamlit."""
-    if _has_st:
-        @st.cache_data(ttl=ttl)
-        def _cached():
-            sb = _get_sb()
-            result = sb.table("clients").select("*").order("short_name").execute()
-            return result.data or []
-        return _cached()
+def get_clients() -> List[Dict]:
     sb = _get_sb()
     result = sb.table("clients").select("*").order("short_name").execute()
     return result.data or []
@@ -229,21 +214,6 @@ def save_project(project_data: dict) -> int:
 
 
 def get_projects(limit: int = 50, status: str = None) -> List[Dict]:
-    if _has_st:
-        @st.cache_data(ttl=60)
-        def _cached(limit, status):
-            sb = _get_sb()
-            query = sb.table("projects").select("*, clients(short_name, full_name)").order("created_at", desc=True).limit(limit)
-            if status: query = query.eq("status", status)
-            result = query.execute()
-            data = result.data or []
-            for p in data:
-                if p.get("clients"):
-                    p["client_short"] = p["clients"]["short_name"] if isinstance(p["clients"], dict) else ""
-                    p["client_full"] = p["clients"]["full_name"] if isinstance(p["clients"], dict) else ""
-            return data
-        return _cached(limit, status)
-
     sb = _get_sb()
     query = sb.table("projects").select("*, clients(short_name, full_name)").order("created_at", desc=True).limit(limit)
     if status:
