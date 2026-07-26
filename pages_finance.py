@@ -178,8 +178,9 @@ def _render_table(projects):
     tr:nth-child(even) {{ background: #fafafa; }}
     </style>
     <table>
-    <tr><th>阶段</th><th>年月</th><th>编号</th><th>品牌</th><th>客户</th><th>金额</th>
-    <th>执行周期</th><th>预计付款</th><th>成本细项</th><th>成本金额</th><th>总成本</th><th>立项</th><th>到账</th><th>结案</th></tr>
+    <tr><th>序号</th><th>客户</th><th>项目名称</th><th>编号</th><th>确认函金额</th>
+    <th>Invoice金额</th><th>执行周期</th><th>预计付款</th><th>成本细项</th><th>成本金额</th>
+    <th>总成本</th><th>立项</th><th>到账</th><th>结案</th><th>阶段</th></tr>
     {rows_html}
     </table>
     """
