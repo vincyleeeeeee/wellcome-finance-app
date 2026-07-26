@@ -205,7 +205,7 @@ def _export_excel(projects):
     import openpyxl as xl
     from openpyxl.styles import Font, Alignment, Border, Side
     wb = xl.Workbook(); ws = wb.active; ws.title = "成本明细"
-    hs = ['项目编号','品牌','客户','阶段','金额','成本细项','成本金额','币种','到账','结案']
+    hs = ['序号','客户','项目名称','编号','金额','执行周期','预计付款','成本细项','成本金额','总成本','立项','到账','结案','阶段']
     thin = Side(style='thin')
     for c,h in enumerate(hs,1):
         cell=ws.cell(1,c,h); cell.font=Font(bold=True); cell.alignment=Alignment(horizontal='center',vertical='center')
@@ -218,29 +218,40 @@ def _export_excel(projects):
         try: items=json.loads(p.get('cost_breakdown','') or '[]')
         except: items=[]
         start_row = row
+        total_cost = p.get('estimated_cost',0) or 0
+        feishu = '是' if p.get('feishu_approved') else '否'
+        exec_p = p.get('execution_period','') or ''
+        exp_p = str(p.get('expected_payment_date','') or '')[:10]
         if items:
             for it in items:
-                ws.cell(row,6,it.get('name','')); ws.cell(row,7,it.get('amount',0))
-                ws.cell(row,8,it.get('currency','RMB'))
+                ws.cell(row,8,it.get('name','')); ws.cell(row,9,it.get('amount',0))
                 row+=1
         else:
-            ws.cell(row,7,p.get('estimated_cost',0)); ws.cell(row,8,'RMB')
+            ws.cell(row,9,total_cost)
             row+=1
         end_row = row - 1
 
-        # Write merged project info and merge cells if multiple rows
-        ws.cell(start_row,1,p.get('project_code','')); ws.cell(start_row,2,p.get('brand_name',''))
-        ws.cell(start_row,3,p.get('client_short','')); ws.cell(start_row,4,stage)
+        # Write merged project info
+        ws.cell(start_row,1,p.get('id',''))
+        ws.cell(start_row,2,p.get('client_short',''))
+        ws.cell(start_row,3,(p.get('project_name','') or '')[:35])
+        ws.cell(start_row,4,p.get('project_code',''))
         ws.cell(start_row,5,f"{p.get('currency','USD')} {p.get('amount',0):,.0f}")
-        ws.cell(start_row,9,paid); ws.cell(start_row,10,closure)
+        ws.cell(start_row,6,exec_p)
+        ws.cell(start_row,7,exp_p)
+        ws.cell(start_row,10,total_cost)
+        ws.cell(start_row,11,feishu)
+        ws.cell(start_row,12,paid)
+        ws.cell(start_row,13,closure)
+        ws.cell(start_row,14,stage)
 
-        # Center everything
-        for c in range(1,11):
+        # Center
+        for c in range(1,15):
             ws.cell(start_row,c).alignment=Alignment(horizontal='center',vertical='center')
 
-        # Merge cells if project has multiple cost rows
+        # Merge cells for multi-row projects
         if end_row > start_row:
-            for c in [1,2,3,4,5,9,10]:  # columns to merge
+            for c in [1,2,3,4,5,6,7,10,11,12,13,14]:
                 ws.merge_cells(start_row=start_row, start_column=c, end_row=end_row, end_column=c)
 
         # Borders
