@@ -99,19 +99,28 @@ def _save_session(user_id):
     st.session_state['_last_active'] = datetime.now().isoformat()
 
 def _restore_session():
-    """Try to restore user from session state."""
+    """Try to restore user from session state or URL token."""
     uid = st.session_state.get('_logged_in_user_id')
     last = st.session_state.get('_last_active')
     if uid and last:
-        # Session valid for 7 days of inactivity
         try:
             last_dt = datetime.fromisoformat(last)
-            if (datetime.now() - last_dt).days < 7:
+            if (datetime.now() - last_dt).days < 30:
                 result = get_connection().table("users").select("*").eq("id", uid).execute()
                 if result.data:
                     return result.data[0]
-        except:
-            pass
+        except: pass
+    # Try URL token (survives server restarts)
+    try:
+        import base64 as _b64
+        token = st.query_params.get('t', '')
+        if token and not uid:
+            uid2 = int(_b64.b64decode(token.encode()).decode())
+            result = get_connection().table("users").select("*").eq("id", uid2).execute()
+            if result.data:
+                _save_session(uid2)
+                return result.data[0]
+    except: pass
     return None
 
 def _heartbeat():
@@ -217,6 +226,9 @@ def page_login():
             elif user['approved'] == 0:
                 st.warning("你的账号尚未通过审核，请等待管理员审批")
             else:
+                import base64 as _b64
+                token = _b64.b64encode(str(user['id']).encode()).decode()
+                st.query_params['t'] = token
                 _save_session(user['id'])
                 st.session_state.user = user
                 st.session_state.page = "workspace"
