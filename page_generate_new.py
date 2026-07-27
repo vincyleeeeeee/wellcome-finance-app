@@ -302,7 +302,7 @@ def _act_confirmation(ed, user):
             subj,body = generate_email_confirmation(proj)
             with st.expander("📧 邮件"):
                 st.text_input("主题", value=subj); st.text_area("正文", value=body, height=120)
-            st.success("已生成！请发给客户盖章。"); st.rerun()
+            st.success("已生成！下载上方文件发给客户盖章。")
     with col_skip:
         if st.button("⏭️ 跳过（客户自回传）", use_container_width=True,
                      help="POP等客户会自己回传确认函，无需我们生成"):
