@@ -82,7 +82,8 @@ def _quick_create(client_names, cmap, user):
             if 'qc_code' in st.session_state:
                 st.session_state['qc_code'] = code
             st.text_input("项目编号", value=code, key="qc_code")
-            st.text_input("项目名称 *", key="qc_name")
+            st.text_input("项目名称 *", key="qc_name",
+                          placeholder="品牌名-年月-产品类型-小红书UGC/小红书KOL-数量")
             st.text_input("品牌名 *", key="qc_brand")
         with col2:
             cur = st.selectbox("币种", ["USD","RMB"], key="qc_cur")
@@ -182,7 +183,9 @@ def _show_info(edit_data, client_names, cmap, user):
         if 'ei_code' in st.session_state:
             st.session_state['ei_code'] = default_code
         st.text_input("项目编号", value=default_code, key="ei_code")
-        st.text_input("项目名称", value=edit_data.get('project_name',''), key="ei_name")
+        st.text_input("项目名称", value=edit_data.get('project_name',''), key="ei_name",
+                      placeholder="品牌名-年月-产品类型-小红书UGC/小红书KOL-数量",
+                      help="格式：CATHY DOLL-202608-护肤品-小红书UGC-200篇")
         st.text_input("品牌名", value=edit_data.get('brand_name',''), key="ei_brand")
         ci = 0 if edit_data.get('currency','USD')=='USD' else 1
         st.selectbox("币种", ["USD","RMB"], index=ci, key="ei_cur")
