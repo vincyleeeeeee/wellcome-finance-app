@@ -132,8 +132,18 @@ def _show_info(edit_data, client_names, cmap, user):
 
         # Project code with month selector
         from utils.database import get_next_code_for_month
+        # Get month from existing code if available, else current month
+        existing_code = edit_data.get('project_code','')
+        default_month = datetime.now().month
+        if existing_code and len(existing_code) >= 8:
+            try:
+                if len(existing_code) >= 15:  # old format WELL20260717012
+                    default_month = int(existing_code[8:10])
+                else:  # new format WELL260801001
+                    default_month = int(existing_code[6:8])
+            except: pass
         cm = st.selectbox("编号月份", list(range(1,13)),
-                          index=datetime.now().month-1,
+                          index=default_month-1,
                           format_func=lambda m:f"{m}月", key="ei_month")
         next_code = get_next_code_for_month(datetime.now().year, cm)
         if edit_data.get('project_code'):
