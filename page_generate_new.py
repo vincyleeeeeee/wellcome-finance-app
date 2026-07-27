@@ -39,6 +39,24 @@ def page_generate():
     if edit_data:
         _show_info(edit_data, client_names, cmap, user)
         st.divider()
+
+        # Persistent confirmation download
+        if st.session_state.get('confirmation_path') and os.path.exists(st.session_state['confirmation_path']):
+            cf = st.session_state['confirmation_proj']
+            with st.container(border=True):
+                st.success("📄 确认函已生成，下载后点下方按钮进入下一步")
+                with open(st.session_state['confirmation_path'], 'rb') as f:
+                    st.download_button("📥 下载确认函", f, file_name=f"{cf.get('brand_name','')}-confirmation-letter.docx", key="dlcf_p")
+                subj,body = generate_email_confirmation(cf)
+                with st.expander("📧 邮件"):
+                    st.text_input("主题", value=subj, key="cf_s"); st.text_area("正文", value=body, height=120, key="cf_b")
+                if st.button("✅ 已下载，进入下一步", type="primary", use_container_width=True):
+                    get_connection().table("projects").update({"status":"confirmation_sent"}).eq("id",edit_data['id']).execute()
+                    st.session_state.pop('confirmation_path', None)
+                    st.session_state.pop('confirmation_proj', None)
+                    st.rerun()
+        st.divider()
+
         _stage_actions(edit_data, user)
     else:
         st.info("从「📝 项目工作台」选择一个项目，或新建一个项目")
@@ -296,13 +314,9 @@ def _act_confirmation(ed, user):
                     'shooting_date':ed.get('shooting_date',''),'total_posts':ed.get('total_posts',''),
                     'amount':ed.get('amount',0),'application_date':datetime.now().strftime('%b %d, %Y')}
             path = generate_confirmation_letter({'full_name':client.get('full_name',''),'contact':client.get('contact','')}, proj)
-            get_connection().table("projects").update({"status":"confirmation_sent"}).eq("id",ed['id']).execute()
-            with open(path,'rb') as f:
-                st.download_button("📥 下载确认函", f, file_name=f"{ed.get('brand_name','')}-confirmation-letter.docx", key="dlcf4")
-            subj,body = generate_email_confirmation(proj)
-            with st.expander("📧 邮件"):
-                st.text_input("主题", value=subj); st.text_area("正文", value=body, height=120)
-            st.success("已生成！下载上方文件发给客户盖章。")
+            st.session_state['confirmation_path'] = path
+            st.session_state['confirmation_proj'] = proj
+            st.rerun()
     with col_skip:
         if st.button("⏭️ 跳过（客户自回传）", use_container_width=True,
                      help="POP等客户会自己回传确认函，无需我们生成"):
