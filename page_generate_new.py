@@ -69,10 +69,28 @@ def _quick_create(client_names, cmap, user):
             if sel == 'POP':
                 qc_due_default = datetime(today.year, today.month+1, 5) if today.month < 12 else datetime(today.year+1, 1, 5)
             elif sel == 'KLT':
-                qc_due_default = datetime(today.year, today.month, 10 if today.day<10 else 25) if today.day<25 else datetime(today.year, today.month+1, 10)
+                # KLT pays 50% on next 10th, 50% on next 25th
+                if today.day < 10:
+                    first = datetime(today.year, today.month, 10)
+                    second = datetime(today.year, today.month, 25)
+                elif today.day < 25:
+                    first = datetime(today.year, today.month, 25)
+                    if today.month == 12: second = datetime(today.year+1, 1, 10)
+                    else: second = datetime(today.year, today.month+1, 10)
+                else:
+                    if today.month == 12:
+                        first = datetime(today.year+1, 1, 10)
+                        second = datetime(today.year+1, 1, 25)
+                    else:
+                        first = datetime(today.year, today.month+1, 10)
+                        second = datetime(today.year, today.month+1, 25)
+                qc_due_default = first
             st.date_input("到期日（客户付款时间）", value=qc_due_default, key="qc_due")
             if sel == 'POP': st.caption("💡 POP 默认次月5日付款")
-            elif sel == 'KLT': st.caption("💡 KLT 每月10日或25日付款")
+            elif sel == 'KLT':
+                f1 = first.strftime('%-m月%-d日') if hasattr(first,'strftime') else str(first)
+                f2 = second.strftime('%-m月%-d日') if hasattr(second,'strftime') else str(second)
+                st.caption(f"💡 KLT 分两次付款：50% {f1} + 50% {f2}")
             else: st.caption("💡 请与客户确认付款时间")
         if st.button("💾 创建项目", type="primary", use_container_width=True):
             data = {
@@ -164,7 +182,18 @@ def _show_info(edit_data, client_names, cmap, user):
 
         due_note = ""
         if sel == 'POP': due_note = "💡 POP 默认次月5日付款"
-        elif sel == 'KLT': due_note = "💡 KLT 每月10日或25日付款"
+        elif sel == 'KLT':
+            today2 = datetime.now()
+            if today2.day < 10:
+                f1, f2 = f"{today2.month}月10日", f"{today2.month}月25日"
+            elif today2.day < 25:
+                f1 = f"{today2.month}月25日"
+                nm = today2.month+1 if today2.month<12 else 1
+                f2 = f"{nm}月10日"
+            else:
+                nm = today2.month+1 if today2.month<12 else 1
+                f1, f2 = f"{nm}月10日", f"{nm}月25日"
+            due_note = f"💡 KLT 分两次付款：50% {f1} + 50% {f2}"
         else: due_note = "💡 请与客户确认付款时间"
         st.caption(due_note)
         st.text_input("合作内容", value=edit_data.get('content_type','') or 'UGC铺量', key="ei_content")
