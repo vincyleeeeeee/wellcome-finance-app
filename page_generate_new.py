@@ -55,6 +55,8 @@ def _quick_create(client_names, cmap, user):
                                     format_func=lambda m:f"{m}月", key="qc_month")
             code = get_next_code_for_month(datetime.now().year, qc_month)
             st.success(f"📝 {qc_month}月下一个可用编号：**{code}**")
+            if 'qc_code' in st.session_state:
+                st.session_state['qc_code'] = code
             st.text_input("项目编号", value=code, key="qc_code")
             st.text_input("项目名称 *", key="qc_name")
             st.text_input("品牌名 *", key="qc_brand")
@@ -122,6 +124,9 @@ def _show_info(edit_data, client_names, cmap, user):
         else:
             default_code = next_code
             st.success(f"📝 {cm}月下一个可用编号：**{next_code}**")
+        # Force update project code when month changes
+        if 'ei_code' in st.session_state:
+            st.session_state['ei_code'] = default_code
         st.text_input("项目编号", value=default_code, key="ei_code")
         st.text_input("项目名称", value=edit_data.get('project_name',''), key="ei_name")
         st.text_input("品牌名", value=edit_data.get('brand_name',''), key="ei_brand")
