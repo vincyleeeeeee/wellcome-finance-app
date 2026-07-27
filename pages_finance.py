@@ -16,6 +16,20 @@ STAGE_MAP = {'draft': '草稿', 'pending': '待审核', 'approved': '已开发�
 CLOSURE_MAP = {'active': '进行中', 'pending_payment': '待收款', 'closed': '已结案'}
 
 
+def _fmt_exec(val):
+    """Convert execution period to Chinese format."""
+    import re
+    m = {'Jan':'01','Feb':'02','Mar':'03','Apr':'04','May':'05','Jun':'06',
+         'Jul':'07','Aug':'08','Sep':'09','Oct':'10','Nov':'11','Dec':'12','January':'01','February':'02','March':'03','April':'04','June':'06','July':'07','August':'08','September':'09','October':'10','November':'11','December':'12'}
+    for eng, num in m.items():
+        if eng in val:
+            val = val.replace(eng, num)
+    val = re.sub(r'(\d{4})-(\d{1,2})\s*(到|-|–|~)\s*(\d{4})-(\d{1,2})', r'\1-\2 到 \4-\5', val)
+    # If only "YYYY-MM - YYYY-MM" format
+    val = re.sub(r'(\d{4})-(\d{1,2})\s*(到|-|–)\s*(\d{2})$', r'\1-\2 到 \1-\4', val) if '202' in val else val
+    return val
+
+
 def _fmt_date_val(val):
     """Consistent YYYY-MM-DD format."""
     if val is None: return ''
@@ -114,7 +128,7 @@ def _render_table(projects):
         paid = '✅' if p.get('payment_received') else ''
         feishu = '是' if p.get('feishu_approved') else '否'
         total_cost = p.get('estimated_cost',0) or 0
-        exec_period = p.get('execution_period','') or ''
+        exec_period = _fmt_exec(p.get('execution_period','') or '')
         exp_pay = str(p.get('expected_payment_date','') or '')[:10]
         code = p.get('project_code','')
         if len(code) >= 15: year_month = f"{code[4:8]}-{code[8:10]}"
