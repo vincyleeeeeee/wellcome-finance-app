@@ -101,7 +101,7 @@ def is_approved(user_id: int) -> bool:
 
 def get_pending_users() -> List[Dict]:
     sb = _get_sb()
-    result = sb.table("users").select("*").eq("approved", False).neq("role", "admin").order("created_at", desc=True).execute()
+    result = sb.table("users").select("*").eq("approved", False).neq("role", "admin").order("created_at").execute()
     return result.data or []
 
 
@@ -119,7 +119,7 @@ def reject_user(user_id: int) -> bool:
 
 def get_all_users() -> List[Dict]:
     sb = _get_sb()
-    result = sb.table("users").select("*").order("created_at", desc=True).execute()
+    result = sb.table("users").select("*").order("created_at").execute()
     return result.data or []
 
 
@@ -215,7 +215,7 @@ def save_project(project_data: dict) -> int:
 
 def get_projects(limit: int = 50, status: str = None) -> List[Dict]:
     sb = _get_sb()
-    query = sb.table("projects").select("*, clients(short_name, full_name)").order("created_at", desc=True).limit(limit)
+    query = sb.table("projects").select("*, clients(short_name, full_name)").order("created_at").limit(limit)
     if status:
         query = query.eq("status", status)
     result = query.execute()
@@ -271,7 +271,7 @@ def reject_project(project_id: int, finance_user_id: int) -> bool:
 
 def get_pending_approvals() -> List[Dict]:
     sb = _get_sb()
-    result = sb.table("projects").select("*, clients(short_name, full_name), creator:created_by(username)").eq("status", "pending").order("created_at", desc=True).execute()
+    result = sb.table("projects").select("*, clients(short_name, full_name), creator:created_by(username)").eq("status", "pending").order("created_at").execute()
     data = result.data or []
     for p in data:
         if p.get("clients"):
