@@ -41,11 +41,17 @@ def page_generate():
         st.divider()
 
         # Persistent confirmation download
-        if st.session_state.get('confirmation_path') and os.path.exists(st.session_state['confirmation_path']):
+        if st.session_state.get('confirmation_path'):
+            cf_path = st.session_state['confirmation_path']
             cf = st.session_state['confirmation_proj']
+            if not os.path.exists(cf_path):
+                # Regenerate if file was cleaned up
+                client = get_client_by_id(edit_data.get('client_id')) if edit_data else {}
+                cf_path = generate_confirmation_letter({'full_name':client.get('full_name',''),'contact':client.get('contact','')}, cf)
+                st.session_state['confirmation_path'] = cf_path
             with st.container(border=True):
-                st.success("📄 确认函已生成，下载后点下方按钮进入下一步")
-                with open(st.session_state['confirmation_path'], 'rb') as f:
+                st.success("📄 确认函已生成！下载后点下方按钮进入下一步")
+                with open(cf_path, 'rb') as f:
                     st.download_button("📥 下载确认函", f, file_name=f"{cf.get('brand_name','')}-confirmation-letter.docx", key="dlcf_p")
                 subj,body = generate_email_confirmation(cf)
                 with st.expander("📧 邮件"):
