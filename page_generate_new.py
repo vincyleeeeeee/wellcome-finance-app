@@ -290,11 +290,11 @@ def _act_confirmation(ed, user):
     with col_gen:
         if st.button("📄 生成确认函", type="primary", use_container_width=True):
             client = get_client_by_id(ed.get('client_id')) or {}
-            proj = {'project_code':ed.get('project_code',''),'project_name':ed.get('project_name',''),
-                    'brand_name':ed.get('brand_name',''),'venue':ed.get('venue',''),
-                    'execution_period':ed.get('execution_period',''),'shooting_date':ed.get('shooting_date',''),
-                    'total_posts':ed.get('total_posts',''),'amount':ed.get('amount',0),
-                    'application_date':datetime.now().strftime('%b %d, %Y')}
+            proj = {'client_short':client.get('short_name',''),'project_code':ed.get('project_code',''),
+                    'project_name':ed.get('project_name',''),'brand_name':ed.get('brand_name',''),
+                    'venue':ed.get('venue',''),'execution_period':ed.get('execution_period',''),
+                    'shooting_date':ed.get('shooting_date',''),'total_posts':ed.get('total_posts',''),
+                    'amount':ed.get('amount',0),'application_date':datetime.now().strftime('%b %d, %Y')}
             path = generate_confirmation_letter({'full_name':client.get('full_name',''),'contact':client.get('contact','')}, proj)
             get_connection().table("projects").update({"status":"confirmation_sent"}).eq("id",ed['id']).execute()
             with open(path,'rb') as f:
