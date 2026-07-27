@@ -145,11 +145,12 @@ def _show_info(edit_data, client_names, cmap, user):
         cm = st.selectbox("编号月份", list(range(1,13)),
                           index=default_month-1,
                           format_func=lambda m:f"{m}月", key="ei_month")
-        next_code = get_next_code_for_month(datetime.now().year, cm)
         if edit_data.get('project_code'):
+            # Editing existing → keep original code
             default_code = edit_data['project_code']
-            st.success(f"📝 {cm}月下一个可用编号：**{next_code}**（当前使用：{default_code}）")
         else:
+            # New project → show next available
+            next_code = get_next_code_for_month(datetime.now().year, cm)
             default_code = next_code
             st.success(f"📝 {cm}月下一个可用编号：**{next_code}**")
         # Force update project code when month changes
