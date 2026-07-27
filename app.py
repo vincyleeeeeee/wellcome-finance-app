@@ -55,6 +55,11 @@ st.set_page_config(
 st.markdown("""
 <style>
 html, body, [class*="css"] { font-size: 18px !important; }
+/* Auto-select number input content on focus */
+input[type="number"]:focus { outline: 2px solid #1a73e8; }
+input[type="number"] { -moz-appearance: textfield; }
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 div[data-testid="stSidebar"] button { font-size: 17px !important; padding: 14px 10px !important; margin: 4px 0 !important; }
 div[data-testid="stMetricValue"] { font-size: 32px !important; }
 div[data-testid="stMetricLabel"] { font-size: 16px !important; }

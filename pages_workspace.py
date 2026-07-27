@@ -21,7 +21,7 @@ def page_workspace():
     projects = get_projects(limit=300)
     show_all = st.checkbox("显示所有项目", value=(user['role'] in ('admin','finance')))
     if not show_all:
-        projects = [p for p in projects if p.get('created_by') == user['id']]
+        projects = [p for p in projects if p.get('created_by') == user['id'] or p.get('owner_name') == user['username']]
 
     if not projects:
         st.info("暂无项目。去「📄 生成文档」创建第一个！")

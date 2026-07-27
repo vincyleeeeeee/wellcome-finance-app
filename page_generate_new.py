@@ -151,7 +151,8 @@ def _show_info(edit_data, client_names, cmap, user):
 
         users_list = get_all_users()
         unames = [u['username'] for u in users_list]
-        dow = unames.index(edit_data.get('owner_name','')) if edit_data.get('owner_name') in unames else 0
+        owner_name = edit_data.get('owner_name','') or user['username']
+        dow = unames.index(owner_name) if owner_name in unames else 0
         st.selectbox("负责人", unames, index=dow, key="ei_owner")
 
         # Project code with month selector
