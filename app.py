@@ -1164,6 +1164,12 @@ def _receipt_form(client, project):
                     stamped_name
                 )
                 st.success("✅ 收据已生成！")
+                # Save receipt path to database if we have a project
+                rid = project.get('id') if project else None
+                if not rid and st.session_state.get('receipt_project_id'):
+                    rid = st.session_state['receipt_project_id']
+                if rid:
+                    get_connection().table("projects").update({"receipt_stamped_path": stamped_name}).eq("id", rid).execute()
                 st.session_state['receipt_stamped'] = stamped_name
                 st.session_state['receipt_brand'] = receipt_data.get('brand_name', 'receipt')
                 st.rerun()
