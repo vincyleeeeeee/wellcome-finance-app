@@ -54,55 +54,20 @@ st.set_page_config(
 # ============================================================
 st.markdown("""
 <style>
-/* === 字体放大，适配年长用户 === */
-html, body, [class*="css"] {
-    font-size: 16px !important;
-}
-div[data-testid="stSidebar"] button {
-    font-size: 15px !important;
-    padding: 12px 8px !important;
-    margin: 3px 0 !important;
-}
-div[data-testid="stMetricValue"] {
-    font-size: 28px !important;
-}
-div[data-testid="stMetricLabel"] {
-    font-size: 14px !important;
-}
+html, body, [class*="css"] { font-size: 18px !important; }
+div[data-testid="stSidebar"] button { font-size: 17px !important; padding: 14px 10px !important; margin: 4px 0 !important; }
+div[data-testid="stMetricValue"] { font-size: 32px !important; }
+div[data-testid="stMetricLabel"] { font-size: 16px !important; }
 div[data-testid="stSelectbox"] label, div[data-testid="stTextInput"] label,
 div[data-testid="stNumberInput"] label, div[data-testid="stDateInput"] label,
-div[data-testid="stCheckbox"] label {
-    font-size: 15px !important;
-}
-input, select, textarea, .stTextInput input, .stNumberInput input {
-    font-size: 16px !important;
-}
-button[kind="primary"] {
-    font-size: 16px !important;
-    padding: 10px 16px !important;
-}
-h1, .st-emotion-cache-10trblm {
-    font-size: 28px !important;
-}
-h2, .st-emotion-cache-1v0mbdj {
-    font-size: 22px !important;
-}
-h3 {
-    font-size: 18px !important;
-}
-/* Active sidebar button highlight */
-div[data-testid="stSidebar"] button[kind="primary"] {
-    background-color: #1a73e8 !important;
-    color: white !important;
-    border: 2px solid #1557b0 !important;
-    font-weight: bold !important;
-    font-size: 16px !important;
-}
-div[data-testid="stSidebar"] button[kind="secondary"] {
-    background-color: transparent !important;
-    color: #555 !important;
-    font-size: 15px !important;
-}
+div[data-testid="stCheckbox"] label { font-size: 17px !important; }
+input, select, textarea, .stTextInput input, .stNumberInput input { font-size: 18px !important; }
+button[kind="primary"] { font-size: 18px !important; padding: 12px 18px !important; }
+h1 { font-size: 32px !important; }
+h2 { font-size: 26px !important; }
+h3 { font-size: 20px !important; }
+div[data-testid="stSidebar"] button[kind="primary"] { background-color: #1a73e8 !important; color: white !important; border: 2px solid #1557b0 !important; font-weight: bold !important; font-size: 18px !important; }
+div[data-testid="stSidebar"] button[kind="secondary"] { background-color: transparent !important; color: #555 !important; font-size: 17px !important; }
 </style>
 """, unsafe_allow_html=True)
 
