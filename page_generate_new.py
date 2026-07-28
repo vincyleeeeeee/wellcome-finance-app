@@ -83,7 +83,8 @@ def _quick_create(client_names, cmap, user):
                 st.session_state['qc_code'] = code
             st.text_input("项目编号", value=code, key="qc_code")
             st.text_input("项目名称 *", key="qc_name",
-                          placeholder="品牌名-年月-产品类型-小红书UGC/小红书KOL-数量")
+                          placeholder="laclef_202606_公寓测评_小红书KOL_4")
+            st.caption("格式：品牌_年月_产品类型_小红书UGC/小红书KOL_数量")
             st.text_input("品牌名 *", key="qc_brand")
         with col2:
             cur = st.selectbox("币种", ["USD","RMB"], key="qc_cur")
@@ -184,8 +185,8 @@ def _show_info(edit_data, client_names, cmap, user):
             st.session_state['ei_code'] = default_code
         st.text_input("项目编号", value=default_code, key="ei_code")
         st.text_input("项目名称", value=edit_data.get('project_name',''), key="ei_name",
-                      placeholder="品牌名-年月-产品类型-小红书UGC/小红书KOL-数量",
-                      help="格式：CATHY DOLL-202608-护肤品-小红书UGC-200篇")
+                      placeholder="laclef_202606_公寓测评_小红书KOL_4")
+        st.caption("格式：品牌_年月_产品类型_小红书UGC/小红书KOL_数量")
         st.text_input("品牌名", value=edit_data.get('brand_name',''), key="ei_brand")
         ci = 0 if edit_data.get('currency','USD')=='USD' else 1
         st.selectbox("币种", ["USD","RMB"], index=ci, key="ei_cur")
@@ -193,9 +194,11 @@ def _show_info(edit_data, client_names, cmap, user):
 
     with col2:
         st.text_input("执行地点", value=edit_data.get('venue','') or 'Bangkok', key="ei_venue")
-        st.text_input("执行周期", value=edit_data.get('execution_period',''), key="ei_period")
+        st.text_input("执行周期", value=edit_data.get('execution_period',''), key="ei_period",
+                      placeholder="格式：Aug 2026 - Oct 2026")
         st.text_input("拍摄时间", value=edit_data.get('shooting_date',''), key="ei_shoot")
-        st.text_input("总篇数", value=edit_data.get('total_posts',''), key="ei_posts")
+        st.text_input("总篇数", value=edit_data.get('total_posts',''), key="ei_posts",
+                      placeholder="格式：150 photo posts")
 
         # Due date with client-specific defaults
         def _default_due(short_name):
@@ -363,6 +366,7 @@ def _act_submit(ed, user):
     errs = []
     if not ed.get('stamped_confirmation'): errs.append("❌ 未上传盖章确认函")
     if not ed.get('estimated_cost'): errs.append("❌ 成本构成为空")
+    if not ed.get('project_code'): errs.append("❌ 项目编号为空，请先填写并保存基本信息")
     if errs:
         for e in errs: st.error(e)
         return
