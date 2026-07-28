@@ -166,7 +166,7 @@ def _show_info(edit_data, client_names, cmap, user):
                 if len(existing_code) >= 15:  # old format WELL20260717012
                     default_month = int(existing_code[8:10])
                 else:  # new format WELL260801001
-                    default_month = int(existing_code[6:8])
+                    default_month = int(existing_code[8:10])
             except: pass
         cm = st.selectbox("编号月份", list(range(1,13)),
                           index=default_month-1,

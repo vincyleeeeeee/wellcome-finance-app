@@ -132,7 +132,7 @@ def _render_table(projects):
         exp_pay = str(p.get('expected_payment_date','') or '')[:10]
         code = p.get('project_code','')
         if len(code) >= 15: year_month = f"{code[4:8]}-{code[8:10]}"
-        elif len(code) >= 8: year_month = f"20{code[4:6]}-{code[6:8]}"
+        elif len(code) >= 8: year_month = f"{code[4:8]}-{code[8:10]}"
         else: year_month = ''
 
         try: cost_items = json.loads(p.get('cost_breakdown','') or '[]')
@@ -317,7 +317,7 @@ def page_approval():
                                 _regen_and_approve(p, user['id'])
                                 st.success("已通过！")
                                 code = p.get('project_code','')
-                                month_str = code[6:8] if len(code)>=8 else ''
+                                month_str = code[8:10] if len(code)>=8 else ''
                                 MONTHS = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
                                           '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
                                 m = MONTHS.get(month_str,'')
@@ -376,7 +376,7 @@ def page_approval():
                     stamped_path = tempfile.mktemp(suffix='.pdf')
                     _gen_stamped_only(p, stamped_path)
                     code = p.get('project_code','')
-                    month_str = code[6:8] if len(code)>=8 else ''
+                    month_str = code[8:10] if len(code)>=8 else ''
                     MONTH_NAMES = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
                                    '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
                     month_name = MONTH_NAMES.get(month_str, '')

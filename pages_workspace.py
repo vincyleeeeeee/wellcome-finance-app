@@ -76,7 +76,7 @@ def page_workspace():
             with cc2:
                 # Download buttons based on stage
                 code_p = p.get('project_code','')
-                ms = code_p[6:8] if len(code_p)>=8 else ''
+                ms = code_p[8:10] if len(code_p)>=15 else ''
                 M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
                      '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
                 mn = M.get(ms,'')
