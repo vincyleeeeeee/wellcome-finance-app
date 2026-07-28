@@ -294,7 +294,7 @@ def generate_project_code(code_date: str) -> str:
     sb = _get_sb()
     from datetime import datetime as dt
     d = dt.strptime(code_date, "%Y-%m-%d")
-    prefix = f"WELL{d.strftime('%y%m%d')}"
+    prefix = f"WELL{d.strftime('%Y%m%d')}"
     result = sb.table("projects").select("id", count="exact").like("project_code", f"{prefix}%").execute()
     seq = (result.count or 0) + 1
     return f"{prefix}{seq:03d}"
@@ -308,9 +308,8 @@ def get_next_code_for_month(year: int, month: int) -> str:
     """
     sb = _get_sb()
     from datetime import datetime as dt
-    prefix = f"WELL{year % 100:02d}{month:02d}"
     first_day = dt(year, month, 1)
-    day_prefix = first_day.strftime('%y%m%d')
+    day_prefix = first_day.strftime('%Y%m%d')
     day_result = sb.table("projects").select("id", count="exact").like("project_code", f"WELL{day_prefix}%").execute()
     day_count = (day_result.count or 0)
     return f"WELL{day_prefix}{day_count + 1:03d}"
