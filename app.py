@@ -26,6 +26,7 @@ from utils.pdf_utils import generate_stamped_pdf
 from utils.receipt_pdf import generate_receipt_pdf
 from pages_finance import page_overview, page_approval
 from pages_workspace import page_workspace
+from pages_infinix import page_infinix
 from page_generate_new import page_generate
 
 
@@ -181,6 +182,9 @@ def render_sidebar():
         st.button("👥 客户管理", use_container_width=True,
                   type="primary" if cur == "clients" else "secondary",
                   on_click=_nav_to, args=("clients",))
+        st.button("📱 Infinix专用", use_container_width=True,
+                  type="primary" if cur == "infinix" else "secondary",
+                  on_click=_nav_to, args=("infinix",))
 
         if user['role'] in ('finance', 'admin'):
             st.divider()
@@ -1395,6 +1399,7 @@ else:
         render_sidebar()
         pages = {
             "workspace": page_workspace,
+            "infinix": page_infinix,
             "generate": page_generate,
             "clients": page_clients,
             "history": page_history,

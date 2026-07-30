@@ -195,6 +195,16 @@ def generate_invoice(client: dict, project: dict) -> str:
     ws['C16'] = "項目「   服务      」款\nltem \"Service'"
     ws['C18'] = f"總付款金額為{cn_amount}\nFull payment of {currency_label} {amount:,.2f}"
 
+    # Infinix-specific: Swift Code XXX underline + signature
+    if client.get('short_name','') == 'Infinix' or client.get('full_name','').upper().startswith('INFINIX'):
+        # Find swift code cell and modify, or add at bottom
+        from openpyxl.styles import Font as XlFont
+        signature_row = 35
+        ws.cell(signature_row, 2, "Swift Code: UBHKHKHHXXX").font = XlFont(name='Microsoft YaHei', size=9, bold=True, underline='single')
+        ws.cell(signature_row+1, 2, "Signature: ____________________")
+        ws.cell(signature_row+2, 2, "Name: ____________________")
+        ws.cell(signature_row+2, 5, "Date: ____________________")
+
     wb.save(output_path)
     return output_path
 
