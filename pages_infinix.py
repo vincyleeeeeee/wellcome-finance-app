@@ -25,20 +25,51 @@ def page_infinix():
 
 
 def _tab_bank_details():
-    st.subheader("Bank Details PDF 盖章")
-    pdf_path = os.path.join(os.path.dirname(__file__), "infinix_bank_details.pdf")
-    if not os.path.exists(pdf_path):
-        st.error("Bank Details 文件未找到")
-        return
+    st.subheader("Bank Details 盖章")
+    from docx import Document as DocxDoc
 
-    if st.button("🔖 生成盖章版 Bank Details", type="primary", use_container_width=True):
-        with st.spinner("正在盖章..."):
-            output = tempfile.mktemp(suffix=".pdf")
-            _stamp_pdf(pdf_path, output)
+    if st.button("🔖 生成 Bank Details（填日期+盖章+签名）", type="primary", use_container_width=True):
+        with st.spinner("正在处理..."):
+            from datetime import datetime
+            today = datetime.now().strftime('%Y/%m/%d')
+
+            # Fill template
+            template_path = os.path.join(os.path.dirname(__file__), "infinix_bank_details.docx")
+            if not os.path.exists(template_path):
+                st.error("模板文件未找到，请联系管理员")
+                return
+
+            doc = DocxDoc(template_path)
+            for p in doc.paragraphs:
+                for run in p.runs:
+                    if run.font.highlight_color is not None:
+                        run.font.highlight_color = None  # Remove yellow
+                        if 'DATE' in p.text or 'Date' in p.text:
+                            run.text = today
+
+            # Save docx
+            docx_tmp = tempfile.mktemp(suffix='.docx')
+            doc.save(docx_tmp)
+
+            # Convert to PDF (LibreOffice)
+            import subprocess
+            pdf_dir = tempfile.mkdtemp()
+            subprocess.run(['soffice', '--headless', '--convert-to', 'pdf', '--outdir', pdf_dir, docx_tmp],
+                          capture_output=True, timeout=60)
+            base = os.path.splitext(os.path.basename(docx_tmp))[0]
+            pdf_tmp = os.path.join(pdf_dir, base + '.pdf')
+
+            if not os.path.exists(pdf_tmp):
+                st.error("PDF 转换失败")
+                return
+
+            # Overlay stamp + signature
+            output = tempfile.mktemp(suffix='.pdf')
+            _stamp_pdf(pdf_tmp, output, 'Terry.Su')
             with open(output, 'rb') as f:
                 st.download_button("📥 下载盖章 Bank Details", f,
                                   file_name="INFINIX-Bank-Details-stamped.pdf",
-                                  key="dl_bank", use_container_width=True)
+                                  key="dl_bank2", use_container_width=True)
             st.success("✅ 已生成！")
 
 
