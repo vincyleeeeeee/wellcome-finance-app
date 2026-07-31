@@ -110,12 +110,12 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None):
 
     stamp_img = PILImage.open(stamp_png).convert("RGBA")
     pw, ph = float(A4[0]), float(A4[1])
-    stamp_w = pw * 0.18
+    stamp_w = pw * 0.22
     ratio = stamp_w / stamp_img.width
     stamp_h = stamp_img.height * ratio
-    # Position over WELLCOME company name area (P21-P22): bottom 10% of page
-    stamp_x = pw - stamp_w - int(pw * 0.08)
-    stamp_y = int(ph * 0.05)  # Near bottom, over company name
+    # ON the dashed signature line (P20): ~12% from bottom
+    stamp_x = pw - stamp_w - int(pw * 0.06)
+    stamp_y = int(ph * 0.12)  # On the "-----" signature line
 
     # Create stamp overlay PDF
     overlay_buf = io.BytesIO()
