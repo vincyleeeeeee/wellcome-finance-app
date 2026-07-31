@@ -62,55 +62,48 @@ def _tab_po_stamp():
 
 
 def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None):
-    """Overlay company stamp + optional signature on every page of a PDF."""
-    # Find stamp image
-    stamp_file = None
+    """Overlay stamp + signature on PDF using pypdf (no poppler needed)."""
+    stamp_png = None
     for p in [
         os.path.join(os.path.dirname(__file__), "stamp", "stamp_hq.png"),
         os.path.join(os.path.dirname(__file__), "stamp", "stamp_final.png"),
     ]:
-        if os.path.exists(p):
-            stamp_file = p
-            break
-    if not stamp_file:
-        raise FileNotFoundError("印章文件未找到")
+        if os.path.exists(p): stamp_png = p; break
+    if not stamp_png: return
 
-    # Render PDF pages to images
-    from pdf2image import convert_from_path
-    images = convert_from_path(input_path, dpi=200)
+    sig_png = os.path.join(os.path.dirname(__file__), "signature.png") if sign_name else None
 
-    stamp_img = PILImage.open(stamp_file).convert("RGBA")
+    stamp_img = PILImage.open(stamp_png).convert("RGBA")
     pw, ph = float(A4[0]), float(A4[1])
+    stamp_w = pw * 0.18
+    ratio = stamp_w / stamp_img.width
+    stamp_h = stamp_img.height * ratio
+    mx = pw * 0.04 + random.randint(-15, 15)
+    my = ph * 0.06 + random.randint(-10, 10)
+    stamp_x = pw - stamp_w - mx
+    stamp_y = my
 
-    stamped_images = []
-    for page_img in images:
-        pw_px, ph_px = page_img.size
-        # Stamp: ~22% of page width, bottom-right
-        stamp_w = int(pw_px * 0.22)
-        ratio = stamp_w / stamp_img.width
-        stamp_h = int(stamp_img.height * ratio)
-        stamp_r = stamp_img.resize((stamp_w, stamp_h), PILImage.LANCZOS)
+    # Create stamp overlay PDF
+    overlay_buf = io.BytesIO()
+    c = rl_canvas.Canvas(overlay_buf, pagesize=(pw, ph))
+    c.drawImage(ImageReader(stamp_img), stamp_x, stamp_y, stamp_w, stamp_h, mask='auto')
 
-        mx = int(pw_px * 0.04) + random.randint(-15, 15)
-        my = int(ph_px * 0.06) + random.randint(-10, 10)
-        x = pw_px - stamp_w - mx
-        y = ph_px - stamp_h - my
+    if sig_png and os.path.exists(sig_png):
+        sig_img = PILImage.open(sig_png).convert("RGBA")
+        sig_w = pw * 0.10
+        sig_ratio = sig_w / sig_img.width
+        sig_h = sig_img.height * sig_ratio
+        sig_x = stamp_x
+        sig_y2 = stamp_y - sig_h - 10
+        c.drawImage(ImageReader(sig_img), sig_x, sig_y2, sig_w, sig_h, mask='auto')
 
-        page_rgba = page_img.convert("RGBA")
-        page_rgba.paste(stamp_r, (x, y), stamp_r)
+    c.save(); overlay_buf.seek(0)
 
-        # Add signature image if available
-        sig_path = os.path.join(os.path.dirname(__file__), "signature.png")
-        if os.path.exists(sig_path) and sign_name:
-            sig_img = PILImage.open(sig_path).convert("RGBA")
-            sig_w = int(pw_px * 0.10)
-            sig_ratio = sig_w / sig_img.width
-            sig_h = int(sig_img.height * sig_ratio)
-            sig_r = sig_img.resize((sig_w, sig_h), PILImage.LANCZOS)
-            sig_x = x
-            sig_y = y - sig_h - 20
-            page_rgba.paste(sig_r, (sig_x, sig_y), sig_r)
-
-        stamped_images.append(page_rgba.convert("RGB"))
-
-    stamped_images[0].save(output_path, "PDF", save_all=True, append_images=stamped_images[1:])
+    # Merge with original PDF
+    reader = pypdf.PdfReader(input_path)
+    writer = pypdf.PdfWriter()
+    overlay_page = pypdf.PdfReader(overlay_buf).pages[0]
+    for page in reader.pages:
+        page.merge_page(overlay_page, over=True)
+        writer.add_page(page)
+    with open(output_path, 'wb') as f: writer.write(f)
