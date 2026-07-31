@@ -113,9 +113,9 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None):
     stamp_w = pw * 0.18
     ratio = stamp_w / stamp_img.width
     stamp_h = stamp_img.height * ratio
-    # Position near P19 (second highlight): ~20% from bottom, stamp RIGHT, signature LEFT
+    # Position over WELLCOME company name area (P21-P22): bottom 10% of page
     stamp_x = pw - stamp_w - int(pw * 0.08)
-    stamp_y = int(ph * 0.20)  # P19 is near signature area
+    stamp_y = int(ph * 0.05)  # Near bottom, over company name
 
     # Create stamp overlay PDF
     overlay_buf = io.BytesIO()
@@ -128,7 +128,7 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None):
         sig_ratio = sig_w / sig_img.width
         sig_h = sig_img.height * sig_ratio
         sig_x = int(pw * 0.08)  # Left side
-        sig_y2 = int(ph * 0.20)  # Same height as stamp, left side
+        sig_y2 = int(ph * 0.05)  # Same height as stamp (bottom of page)
         c.drawImage(ImageReader(sig_img), sig_x, sig_y2, sig_w, sig_h, mask='auto')
 
     c.save(); overlay_buf.seek(0)
