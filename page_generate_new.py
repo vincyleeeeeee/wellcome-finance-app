@@ -117,6 +117,9 @@ def _quick_create(client_names, cmap, user):
                 st.caption(f"💡 KLT 分两次付款：50% {f1} + 50% {f2}")
             else: st.caption("💡 请与客户确认付款时间")
         if st.button("💾 创建项目", type="primary", use_container_width=True):
+            if not st.session_state.get('qc_name') or not st.session_state.get('qc_brand') or (st.session_state.get('qc_amt') or 0) <= 0:
+                st.error("客户、项目名称、品牌名、金额为必填项")
+                st.stop()
             data = {
                 'project_code': st.session_state.get('qc_code',''),
                 'project_name': st.session_state.get('qc_name',''),
@@ -286,6 +289,22 @@ def _show_info(edit_data, client_names, cmap, user):
     if tr>0: st.info(f"总成本(RMB): ¥{tr:,.0f}")
 
     if st.button("💾 保存信息", type="primary", use_container_width=True):
+        # Validate required fields
+        errors = []
+        sel_check = st.session_state.get('ei_sel','')
+        if not sel_check: errors.append("请选择客户")
+        name_check = st.session_state.get('ei_name','')
+        if not name_check: errors.append("请填写项目名称")
+        code_check = st.session_state.get('ei_code','')
+        if not code_check: errors.append("请填写项目编号")
+        amt_check = st.session_state.get('ei_amt') or 0
+        if not amt_check or float(amt_check) <= 0: errors.append("请填写确认函/Invoice金额")
+        period_check = st.session_state.get('ei_period','')
+        if not period_check: errors.append("请填写执行周期")
+        if errors:
+            for e in errors: st.error(e)
+            st.stop()
+
         due = st.session_state.get('ei_due')
         if hasattr(due,'strftime'): due = due.strftime('%Y-%m-%d')
         data = {
