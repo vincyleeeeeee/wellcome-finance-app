@@ -99,17 +99,17 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None):
         page_rgba = page_img.convert("RGBA")
         page_rgba.paste(stamp_r, (x, y), stamp_r)
 
-        # Add signature text if provided
-        if sign_name:
-            from PIL import ImageDraw, ImageFont
-            draw = ImageDraw.Draw(page_rgba)
-            try:
-                font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 40)
-            except:
-                font = ImageFont.load_default()
+        # Add signature image if available
+        sig_path = os.path.join(os.path.dirname(__file__), "signature.png")
+        if os.path.exists(sig_path) and sign_name:
+            sig_img = PILImage.open(sig_path).convert("RGBA")
+            sig_w = int(pw_px * 0.10)
+            sig_ratio = sig_w / sig_img.width
+            sig_h = int(sig_img.height * sig_ratio)
+            sig_r = sig_img.resize((sig_w, sig_h), PILImage.LANCZOS)
             sig_x = x
-            sig_y = y - 60
-            draw.text((sig_x, sig_y), f"Signed: {sign_name}", fill=(0, 0, 200), font=font)
+            sig_y = y - sig_h - 20
+            page_rgba.paste(sig_r, (sig_x, sig_y), sig_r)
 
         stamped_images.append(page_rgba.convert("RGB"))
 
