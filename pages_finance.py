@@ -24,9 +24,9 @@ def _fmt_exec(val):
     for eng, num in m.items():
         if eng in val:
             val = val.replace(eng, num)
-    val = re.sub(r'(\d{4})-(\d{1,2})\s*(到|-|–|~)\s*(\d{4})-(\d{1,2})', r'\1-\2 到 \4-\5', val)
+    val = re.sub(r'(\d{4})-(\d{1,2})\s*(到|-|–|~)\s*(\d{4})-(\d{1,2})', r'\1-\2 -\4-\5', val)
     # If only "YYYY-MM - YYYY-MM" format
-    val = re.sub(r'(\d{4})-(\d{1,2})\s*(到|-|–)\s*(\d{2})$', r'\1-\2 到 \1-\4', val) if '202' in val else val
+    val = re.sub(r'(\d{4})-(\d{1,2})\s*(到|-|–)\s*(\d{2})$', r'\1-\2 -\1-\4', val) if '202' in val else val
     return val
 
 
@@ -129,7 +129,11 @@ def _render_table(projects):
         feishu = '是' if p.get('feishu_approved') else '否'
         total_cost = p.get('estimated_cost',0) or 0
         exec_period = _fmt_exec(p.get('execution_period','') or '')
-        exp_pay = str(p.get('expected_payment_date','') or '')[:10]
+        epd = p.get('expected_payment_date','')
+        if epd:
+            if hasattr(epd, 'strftime'): exp_pay = epd.strftime('%Y/%-m/%-d').replace('/0','/')
+            else: exp_pay = str(epd)[:10].replace('-','/')
+        else: exp_pay = ''
         code = p.get('project_code','')
         if len(code) >= 15: year_month = f"{code[4:8]}-{code[8:10]}"
         elif len(code) >= 8: year_month = f"{code[4:8]}-{code[8:10]}"

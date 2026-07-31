@@ -196,8 +196,14 @@ def _show_info(edit_data, client_names, cmap, user):
 
     with col2:
         st.text_input("执行地点", value=edit_data.get('venue','') or 'Bangkok', key="ei_venue")
-        st.text_input("执行周期", value=edit_data.get('execution_period',''), key="ei_period",
-                      placeholder="格式：Aug 2026 - Oct 2026")
+        col_start, col_end = st.columns(2)
+        with col_start:
+            exec_start = st.date_input("项目开始", value=datetime.now(), key="ei_start")
+        with col_end:
+            exec_end = st.date_input("项目结束", value=datetime.now(), key="ei_end")
+        # Auto-generate execution period
+        exec_period_auto = f"{exec_start.strftime('%Y/%-m/%-d')} - {exec_end.strftime('%Y/%-m/%-d')}"
+        st.caption(f"执行周期：{exec_period_auto}")
         st.text_input("拍摄时间", value=edit_data.get('shooting_date',''), key="ei_shoot")
         st.text_input("总篇数", value=edit_data.get('total_posts',''), key="ei_posts",
                       placeholder="格式：150 photo posts")
@@ -289,7 +295,7 @@ def _show_info(edit_data, client_names, cmap, user):
             'amount':float(st.session_state.get('ei_amt',0) or 0),
             'currency':st.session_state.get('ei_cur','USD'),
             'venue':st.session_state.get('ei_venue',''),
-            'execution_period':st.session_state.get('ei_period',''),
+            'execution_period': exec_period_auto,
             'shooting_date':st.session_state.get('ei_shoot',''),
             'total_posts':st.session_state.get('ei_posts',''),
             'due_date':str(due or ''),
