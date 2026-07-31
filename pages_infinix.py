@@ -110,12 +110,12 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None):
 
     stamp_img = PILImage.open(stamp_png).convert("RGBA")
     pw, ph = float(A4[0]), float(A4[1])
-    stamp_w = pw * 0.20
+    stamp_w = pw * 0.18
     ratio = stamp_w / stamp_img.width
     stamp_h = stamp_img.height * ratio
-    # Dashed line is at y=250 from top = ph-250 from bottom ≈ ph*0.30
+    # Dashed line at y=250 from TOP = ph-250 from BOTTOM ≈ ph*0.70
     stamp_x = pw - stamp_w - int(pw * 0.06)
-    stamp_y = int(ph * 0.29)  # Right on the "-----" dashed line
+    stamp_y = int(ph * 0.70)  # On the dashed signature line
 
     # Create stamp overlay PDF
     overlay_buf = io.BytesIO()
@@ -124,11 +124,11 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None):
 
     if sig_png and os.path.exists(sig_png):
         sig_img = PILImage.open(sig_png).convert("RGBA")
-        sig_w = pw * 0.10
+        sig_w = pw * 0.25  # 2.5x bigger
         sig_ratio = sig_w / sig_img.width
         sig_h = sig_img.height * sig_ratio
-        sig_x = int(pw * 0.08)  # Left side
-        sig_y2 = int(ph * 0.05)  # Same height as stamp (bottom of page)
+        sig_x = int(pw * 0.06)  # Left side of dashed line
+        sig_y2 = int(ph * 0.70)  # On the dashed line
         c.drawImage(ImageReader(sig_img), sig_x, sig_y2, sig_w, sig_h, mask='auto')
 
     c.save(); overlay_buf.seek(0)
