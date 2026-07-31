@@ -1,2 +1,3 @@
 libreoffice-core
 libreoffice-calc
+libreoffice-writer
