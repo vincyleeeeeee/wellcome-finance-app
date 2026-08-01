@@ -26,18 +26,43 @@ def page_infinix():
 
 def _tab_bank_details():
     st.subheader("Bank Details 盖章")
-    pdf_path = os.path.join(os.path.dirname(__file__), "infinix_bank_details_base.pdf")
-    if not os.path.exists(pdf_path):
-        st.error("Bank Details 文件未找到"); return
+    template_path = os.path.join(os.path.dirname(__file__), "infinix_bank_details.docx")
+    if not os.path.exists(template_path):
+        st.error("模板文件未找到"); return
 
-    if st.button("🔖 生成盖章 Bank Details", type="primary", use_container_width=True):
-        with st.spinner("正在盖章..."):
+    if st.button("🔖 生成盖章 Bank Details（自动填日期）", type="primary", use_container_width=True):
+        with st.spinner("正在处理..."):
+            from datetime import datetime
+            from docx import Document as DocxDoc
+            today = datetime.now().strftime('%Y/%m/%d')
+
+            # 1. Fill docx template
+            doc = DocxDoc(template_path)
+            for p in doc.paragraphs:
+                for run in p.runs:
+                    if run.font.highlight_color is not None:
+                        if 'DATE' in p.text or 'Date' in p.text:
+                            run.text = today
+                        run.font.highlight_color = None
+
+            # 2. Save docx → PDF via LibreOffice
+            docx_tmp = tempfile.mktemp(suffix='.docx'); doc.save(docx_tmp)
+            import subprocess
+            pdf_dir = tempfile.mkdtemp()
+            subprocess.run(['soffice', '--headless', '--convert-to', 'pdf', '--outdir', pdf_dir, docx_tmp],
+                          capture_output=True, timeout=60)
+            base_name = os.path.splitext(os.path.basename(docx_tmp))[0]
+            pdf_tmp = os.path.join(pdf_dir, base_name + '.pdf')
+            if not os.path.exists(pdf_tmp):
+                st.error("PDF 转换失败"); return
+
+            # 3. Overlay stamp + signature at bottom 1/3
             output = tempfile.mktemp(suffix='.pdf')
-            _stamp_pdf(pdf_path, output, 'Terry.Su')
+            _stamp_pdf(pdf_tmp, output, 'Terry.Su')
             with open(output, 'rb') as f:
                 st.download_button("📥 下载盖章 Bank Details", f,
                                   file_name="INFINIX-Bank-Details-stamped.pdf",
-                                  key="dl_bank3", use_container_width=True)
+                                  key="dl_bank4", use_container_width=True)
             st.success("✅ 已生成！")
 
 
@@ -74,12 +99,12 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None):
 
     stamp_img = PILImage.open(stamp_png).convert("RGBA")
     pw, ph = float(A4[0]), float(A4[1])
-    stamp_w = pw * 0.36  # 2x bigger
+    stamp_w = pw * 0.20
     ratio = stamp_w / stamp_img.width
     stamp_h = stamp_img.height * ratio
-    # From reference: stamp at ~60% from bottom, centered-right
-    stamp_x = int(pw * 0.40)
-    stamp_y = int(ph * 0.58)  # Reference position
+    # Bottom 1/3 of page (33% from bottom)
+    stamp_x = pw - stamp_w - int(pw * 0.08)  # Right side
+    stamp_y = int(ph * 0.33)
 
     # Create stamp overlay PDF
     overlay_buf = io.BytesIO()
@@ -88,11 +113,11 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None):
 
     if sig_png and os.path.exists(sig_png):
         sig_img = PILImage.open(sig_png).convert("RGBA")
-        sig_w = pw * 0.25  # Bigger
+        sig_w = pw * 0.15
         sig_ratio = sig_w / sig_img.width
         sig_h = sig_img.height * sig_ratio
         sig_x = int(pw * 0.06)  # Left side
-        sig_y2 = int(ph * 0.58)  # Same as stamp
+        sig_y2 = int(ph * 0.33)  # Same height as stamp
         c.drawImage(ImageReader(sig_img), sig_x, sig_y2, sig_w, sig_h, mask='auto')
 
     c.save(); overlay_buf.seek(0)
