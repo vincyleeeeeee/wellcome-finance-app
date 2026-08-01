@@ -99,11 +99,11 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None):
 
     stamp_img = PILImage.open(stamp_png).convert("RGBA")
     pw, ph = float(A4[0]), float(A4[1])
-    stamp_w = pw * 0.20
+    stamp_w = pw * 0.30  # 1.5x of original
     ratio = stamp_w / stamp_img.width
     stamp_h = stamp_img.height * ratio
-    # Bottom 1/3 of page (33% from bottom)
-    stamp_x = pw - stamp_w - int(pw * 0.08)  # Right side
+    # Next to signature, center-right, bottom 1/3
+    stamp_x = int(pw * 0.42)  # Just right of center
     stamp_y = int(ph * 0.33)
 
     # Create stamp overlay PDF
@@ -113,11 +113,11 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None):
 
     if sig_png and os.path.exists(sig_png):
         sig_img = PILImage.open(sig_png).convert("RGBA")
-        sig_w = pw * 0.15
+        sig_w = pw * 0.30  # 2x bigger
         sig_ratio = sig_w / sig_img.width
         sig_h = sig_img.height * sig_ratio
-        sig_x = int(pw * 0.06)  # Left side
-        sig_y2 = int(ph * 0.33)  # Same height as stamp
+        sig_x = int(pw * 0.08)  # Left side
+        sig_y2 = int(ph * 0.30)  # Slightly lower
         c.drawImage(ImageReader(sig_img), sig_x, sig_y2, sig_w, sig_h, mask='auto')
 
     c.save(); overlay_buf.seek(0)
