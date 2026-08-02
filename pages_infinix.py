@@ -58,7 +58,7 @@ def _tab_bank_details():
 
             # 3. Overlay stamp + signature at bottom 1/3
             output = tempfile.mktemp(suffix='.pdf')
-            _stamp_pdf(pdf_tmp, output, 'Terry.Su')
+            _stamp_pdf(pdf_tmp, output, 'Terry.Su')  # Bank Details: bottom 1/3
             with open(output, 'rb') as f:
                 st.download_button("📥 下载盖章 Bank Details", f,
                                   file_name="INFINIX-Bank-Details-stamped.pdf",
@@ -77,7 +77,7 @@ def _tab_po_stamp():
             with open(po_path, 'wb') as f:
                 f.write(uploaded.read())
             output = tempfile.mktemp(suffix=".pdf")
-            _stamp_pdf(po_path, output, sign_name)
+            _stamp_pdf(po_path, output, sign_name, pos_y=0.80)  # PO: 4/5 from bottom
             with open(output, 'rb') as f:
                 st.download_button("📥 下载盖章 PO", f,
                                   file_name="PO-stamped.pdf",
@@ -85,8 +85,8 @@ def _tab_po_stamp():
             st.success("✅ 已生成！")
 
 
-def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None):
-    """Overlay stamp + signature on PDF using pypdf (no poppler needed)."""
+def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None, pos_y: float = 0.33):
+    """Overlay stamp + signature on PDF. pos_y = fraction from bottom (0.33=Bank Details, 0.80=PO)."""
     stamp_png = None
     for p in [
         os.path.join(os.path.dirname(__file__), "stamp", "stamp_hq.png"),
@@ -102,8 +102,8 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None):
     stamp_w = pw * 0.30
     ratio = stamp_w / stamp_img.width
     stamp_h = stamp_img.height * ratio
-    stamp_x = int(pw * 0.32)  # Closer to signature
-    stamp_y = int(ph * 0.33)
+    stamp_x = int(pw * 0.32) if pos_y < 0.5 else pw - stamp_w - int(pw * 0.06)  # PO: right side
+    stamp_y = int(ph * pos_y)
 
     # Create stamp overlay PDF
     overlay_buf = io.BytesIO()
@@ -116,7 +116,7 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None):
         sig_ratio = sig_w / sig_img.width
         sig_h = sig_img.height * sig_ratio
         sig_x = int(pw * 0.08)
-        sig_y2 = int(ph * 0.27)  # Lower
+        sig_y2 = int(ph * (pos_y - 0.03))  # Slightly below stamp
         c.drawImage(ImageReader(sig_img), sig_x, sig_y2, sig_w, sig_h, mask='auto')
 
     c.save(); overlay_buf.seek(0)
