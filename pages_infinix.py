@@ -123,9 +123,9 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None, pos_y: 
         sig_h = sig_img.height * sig_ratio
         sig_x = int(pw * 0.08)
         if pos_y < 0.3:  # PO: 2x bigger, at stamp's lower-left
-            sig_w = pw * 0.22  # Frame text
+            sig_w = pw * 0.15  # Tight around text
             sig_h = sig_img.height * sig_w / sig_img.width
-            sig_x = stamp_x - sig_w - 10  # Left of stamp with gap
+            sig_x = stamp_x - sig_w - 5  # Close to stamp
             sig_y2 = stamp_y  # Same bottom
         else:  # Bank Details: left side
             sig_x = int(pw * 0.08)
