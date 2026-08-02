@@ -118,6 +118,7 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None, pos_y: 
     c.drawImage(ImageReader(stamp_img), stamp_x, stamp_y, stamp_w, stamp_h, mask='auto')
 
     if sig_png and os.path.exists(sig_png):
+        sig_img = PILImage.open(sig_png).convert("RGBA")
         if pos_y < 0.3:  # PO: left of stamp
             sig_w = pw * 0.20
             sig_h = sig_img.height * sig_w / sig_img.width
