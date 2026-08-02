@@ -114,6 +114,13 @@ def _overlay_signature(pdf_path: str, output_path: str):
     sig_x = stamp_x - sig_w - 5
     sig_y = stamp_y
 
+    # Random float ±10%
+    import random
+    stamp_x += random.randint(-int(stamp_w*0.1), int(stamp_w*0.1))
+    stamp_y += random.randint(-int(stamp_h*0.1), int(stamp_h*0.1))
+    sig_x += random.randint(-int(sig_w*0.1), int(sig_w*0.1))
+    sig_y += random.randint(-int(sig_h*0.1), int(sig_h*0.1))
+
     buf = io.BytesIO()
     c = rl_canvas.Canvas(buf, pagesize=(pw, ph))
     c.drawImage(ImageReader(sig_img), sig_x, sig_y, sig_w, sig_h, mask='auto')

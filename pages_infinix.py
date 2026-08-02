@@ -99,17 +99,18 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None, pos_y: 
 
     stamp_img = PILImage.open(stamp_png).convert("RGBA")
     pw, ph = float(A4[0]), float(A4[1])
-    stamp_w = pw * 0.30
+    stamp_w = pw * 0.30  # Unified size
     ratio = stamp_w / stamp_img.width
     stamp_h = stamp_img.height * ratio
-    if pos_y < 0.3:  # PO: bottom-right, 1.5x bigger
-        stamp_w = pw * 0.33  # 1.5x
-        stamp_h = stamp_img.height * stamp_w / stamp_img.width
+    if pos_y < 0.3:  # PO: bottom-right
         stamp_x = pw - stamp_w - int(pw * 0.05)
         stamp_y = int(ph * pos_y)
     else:  # Bank Details: center-right
         stamp_x = int(pw * 0.32)
         stamp_y = int(ph * pos_y)
+    # Random float ±10%
+    stamp_x += random.randint(-int(stamp_w*0.1), int(stamp_w*0.1))
+    stamp_y += random.randint(-int(stamp_h*0.1), int(stamp_h*0.1))
 
     # Create stamp overlay PDF
     overlay_buf = io.BytesIO()
@@ -117,22 +118,20 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None, pos_y: 
     c.drawImage(ImageReader(stamp_img), stamp_x, stamp_y, stamp_w, stamp_h, mask='auto')
 
     if sig_png and os.path.exists(sig_png):
-        sig_img = PILImage.open(sig_png).convert("RGBA")
-        sig_w = pw * 0.22  # 1.5x
-        sig_ratio = sig_w / sig_img.width
-        sig_h = sig_img.height * sig_ratio
-        sig_x = int(pw * 0.08)
-        if pos_y < 0.3:  # PO: 2x bigger, at stamp's lower-left
-            sig_w = pw * 0.20  # Cropped to text
+        if pos_y < 0.3:  # PO: left of stamp
+            sig_w = pw * 0.20
             sig_h = sig_img.height * sig_w / sig_img.width
-            sig_x = stamp_x - sig_w - 5  # Close to stamp
-            sig_y2 = stamp_y  # Same bottom
-            sig_x = stamp_x - sig_w - 5  # Closer to stamp
-            sig_x = int(pw * 0.08)
-            sig_y2 = int(ph * 0.35)  # Slightly lower
-            sig_w = pw * 0.15  # Smaller for Bank Details, don't cover text
+            sig_x = stamp_x - sig_w - 5
+            sig_y2 = stamp_y
+        else:  # Bank: left of stamp
+            sig_w = pw * 0.15
             sig_h = sig_img.height * sig_w / sig_img.width
-        c.drawImage(ImageReader(sig_img), sig_x, sig_y2, sig_w, sig_h, mask='auto')
+            sig_x = stamp_x - sig_w - 5
+            sig_y2 = int(ph * 0.35)
+        # Random float
+        sig_x += random.randint(-int(sig_w*0.1), int(sig_w*0.1))
+        sig_y2 += random.randint(-int(sig_h*0.1), int(sig_h*0.1))
+        c.drawImage(ImageReader(sig_img), sig_x, sig_y2, sig_w, sig_h, mask="auto")
 
     c.save(); overlay_buf.seek(0)
 
