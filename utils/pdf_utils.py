@@ -28,7 +28,7 @@ def xlsx_to_pdf(xlsx_path: str, output_dir: str = None) -> str:
     return pdf_path
 
 
-def generate_stamped_pdf(xlsx_path: str, output_path: str, stamp_path: str = None) -> str:
+def generate_stamped_pdf(xlsx_path: str, output_path: str, stamp_path: str = None, add_signature: bool = False) -> str:
     """Embed stamp into xlsx, then convert to PDF via LibreOffice. Works on cloud."""
     # Find stamp
     if stamp_path is None:
@@ -71,10 +71,59 @@ def generate_stamped_pdf(xlsx_path: str, output_path: str, stamp_path: str = Non
     try:
         outdir = tempfile.mkdtemp()
         pdf_tmp = xlsx_to_pdf(xlsx_stamped, outdir)
-        with open(pdf_tmp, 'rb') as src, open(output_path, 'wb') as dst:
-            dst.write(src.read())
+
+        # Add signature for Infinix projects
+        if add_signature:
+            sig_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "signature.png")
+            if os.path.exists(sig_path):
+                _overlay_signature(pdf_tmp, output_path)
+            else:
+                with open(pdf_tmp, 'rb') as src, open(output_path, 'wb') as dst:
+                    dst.write(src.read())
+        else:
+            with open(pdf_tmp, 'rb') as src, open(output_path, 'wb') as dst:
+                dst.write(src.read())
     finally:
         try: os.unlink(xlsx_stamped)
         except: pass
 
     return output_path
+
+
+def _overlay_signature(pdf_path: str, output_path: str):
+    """Overlay signature image to the left of the stamp on the PDF."""
+    sig_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "signature.png")
+    if not os.path.exists(sig_path):
+        with open(pdf_path, 'rb') as src, open(output_path, 'wb') as dst:
+            dst.write(src.read())
+        return
+
+    from PIL import Image as PILImg
+    from reportlab.pdfgen import canvas as rl_canvas
+    from reportlab.lib.utils import ImageReader
+    sig_img = PILImg.open(sig_path).convert("RGBA")
+    pw, ph = float(A4[0]), float(A4[1])
+
+    # Same position as invoice stamp: bottom-right, sig left of stamp
+    stamp_w = pw * 0.30
+    stamp_x = pw - stamp_w - int(pw * 0.05)
+    stamp_y = int(ph * 0.10)
+
+    sig_w = pw * 0.20
+    sig_h = sig_img.height * sig_w / sig_img.width
+    sig_x = stamp_x - sig_w - 5
+    sig_y = stamp_y
+
+    buf = io.BytesIO()
+    c = rl_canvas.Canvas(buf, pagesize=(pw, ph))
+    c.drawImage(ImageReader(sig_img), sig_x, sig_y, sig_w, sig_h, mask='auto')
+    c.save(); buf.seek(0)
+
+    reader = pypdf.PdfReader(pdf_path)
+    writer = pypdf.PdfWriter()
+    overlay = pypdf.PdfReader(buf).pages[0]
+    for page in reader.pages:
+        page.merge_page(overlay, over=True)
+        writer.add_page(page)
+    with open(output_path, 'wb') as f:
+        writer.write(f)

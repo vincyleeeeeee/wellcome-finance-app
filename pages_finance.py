@@ -462,7 +462,8 @@ def _gen_stamped_only(p, output_path):
     _write_c18(ws, p.get('amount',0), p.get('currency','USD'))
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
     with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f: f.write(buf.read()); xlsx_path=f.name
-    generate_stamped_pdf(xlsx_path, output_path)
+    is_inf = client.get('short_name','') == 'Infinix'
+    generate_stamped_pdf(xlsx_path, output_path, add_signature=is_inf)
     try: os.unlink(xlsx_path)
     except: pass
 
@@ -488,7 +489,8 @@ def _regen_and_approve(p, user_id):
     xlsx_path=tempfile.mktemp(suffix='.xlsx')
     with open(xlsx_path,'wb') as f: f.write(buf.read())
     stamped_path=tempfile.mktemp(suffix='.pdf')
-    generate_stamped_pdf(xlsx_path, stamped_path)
+    is_inf = client.get('short_name','') == 'Infinix'
+    generate_stamped_pdf(xlsx_path, stamped_path, add_signature=is_inf)
     approve_project(p['id'], user_id, stamped_path)
     try: os.unlink(xlsx_path)
     except: pass
