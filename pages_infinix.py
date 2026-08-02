@@ -127,9 +127,9 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None, pos_y: 
             sig_h = sig_img.height * sig_w / sig_img.width
             sig_x = stamp_x - sig_w - 5  # Close to stamp
             sig_y2 = stamp_y  # Same bottom
-        else:  # Bank Details: left side
+            sig_x = stamp_x - sig_w - 5  # Closer to stamp
             sig_x = int(pw * 0.08)
-            sig_y2 = int(ph * 0.27)
+            sig_y2 = int(ph * 0.35)  # Slightly lower
             sig_w = pw * 0.15  # Smaller for Bank Details, don't cover text
             sig_h = sig_img.height * sig_w / sig_img.width
         c.drawImage(ImageReader(sig_img), sig_x, sig_y2, sig_w, sig_h, mask='auto')
