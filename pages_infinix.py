@@ -77,7 +77,7 @@ def _tab_po_stamp():
             with open(po_path, 'wb') as f:
                 f.write(uploaded.read())
             output = tempfile.mktemp(suffix=".pdf")
-            _stamp_pdf(po_path, output, sign_name, pos_y=0.80)  # PO: 4/5 from bottom
+            _stamp_pdf(po_path, output, sign_name, pos_y=0.20)  # PO: 4/5 from top = 1/5 from bottom
             with open(output, 'rb') as f:
                 st.download_button("📥 下载盖章 PO", f,
                                   file_name="PO-stamped.pdf",
@@ -102,7 +102,7 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None, pos_y: 
     stamp_w = pw * 0.30
     ratio = stamp_w / stamp_img.width
     stamp_h = stamp_img.height * ratio
-    if pos_y > 0.5:  # PO: bottom-right corner
+    if pos_y < 0.3:  # PO: bottom-right corner
         stamp_x = pw - stamp_w - int(pw * 0.05)
         stamp_y = int(ph * pos_y)
     else:  # Bank Details: center-right
@@ -120,9 +120,9 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None, pos_y: 
         sig_ratio = sig_w / sig_img.width
         sig_h = sig_img.height * sig_ratio
         sig_x = int(pw * 0.08)
-        if pos_y > 0.5:  # PO: right side, above stamp
+        if pos_y < 0.3:  # PO: right side, close above stamp
             sig_x = pw - sig_w - int(pw * 0.05)
-            sig_y2 = stamp_y - sig_h - 15
+            sig_y2 = stamp_y + stamp_h + 5  # Close above stamp
         else:  # Bank Details: left side
             sig_x = int(pw * 0.08)
             sig_y2 = int(ph * 0.27)
