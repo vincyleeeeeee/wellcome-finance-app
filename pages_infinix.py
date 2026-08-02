@@ -102,8 +102,12 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None, pos_y: 
     stamp_w = pw * 0.30
     ratio = stamp_w / stamp_img.width
     stamp_h = stamp_img.height * ratio
-    stamp_x = int(pw * 0.32) if pos_y < 0.5 else pw - stamp_w - int(pw * 0.06)  # PO: right side
-    stamp_y = int(ph * pos_y)
+    if pos_y > 0.5:  # PO: bottom-right corner
+        stamp_x = pw - stamp_w - int(pw * 0.05)
+        stamp_y = int(ph * pos_y)
+    else:  # Bank Details: center-right
+        stamp_x = int(pw * 0.32)
+        stamp_y = int(ph * pos_y)
 
     # Create stamp overlay PDF
     overlay_buf = io.BytesIO()
@@ -116,7 +120,12 @@ def _stamp_pdf(input_path: str, output_path: str, sign_name: str = None, pos_y: 
         sig_ratio = sig_w / sig_img.width
         sig_h = sig_img.height * sig_ratio
         sig_x = int(pw * 0.08)
-        sig_y2 = int(ph * (pos_y - 0.03))  # Slightly below stamp
+        if pos_y > 0.5:  # PO: right side, above stamp
+            sig_x = pw - sig_w - int(pw * 0.05)
+            sig_y2 = stamp_y - sig_h - 15
+        else:  # Bank Details: left side
+            sig_x = int(pw * 0.08)
+            sig_y2 = int(ph * 0.27)
         c.drawImage(ImageReader(sig_img), sig_x, sig_y2, sig_w, sig_h, mask='auto')
 
     c.save(); overlay_buf.seek(0)
