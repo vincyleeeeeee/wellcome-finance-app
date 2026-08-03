@@ -23,6 +23,24 @@ def page_workspace():
     if not show_all:
         projects = [p for p in projects if p.get('created_by') == user['id'] or p.get('owner_name') == user['username']]
 
+    # === Filter & Search ===
+    col_f1, col_f2 = st.columns([1, 2])
+    with col_f1:
+        owners = list(set(p.get('owner_name','') for p in projects if p.get('owner_name')))
+        owners.insert(0, '全部')
+        sel_owner = st.selectbox("👤 负责人筛选", owners, key="ws_owner_filter")
+        if sel_owner != '全部':
+            projects = [p for p in projects if p.get('owner_name') == sel_owner]
+    with col_f2:
+        search = st.text_input("🔍 搜索（项目名/品牌/编号/客户）", key="ws_search")
+        if search:
+            s = search.lower()
+            projects = [p for p in projects if
+                        s in (p.get('project_name','') or '').lower() or
+                        s in (p.get('brand_name','') or '').lower() or
+                        s in (p.get('project_code','') or '').lower() or
+                        s in (p.get('client_short','') or '').lower()]
+
     if not projects:
         st.info("暂无项目。去「📄 生成文档」创建第一个！")
         return
