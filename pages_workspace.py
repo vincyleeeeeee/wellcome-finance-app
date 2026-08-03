@@ -4,7 +4,8 @@ import streamlit as st
 import os
 from datetime import datetime
 from utils.database import (get_projects, get_client_by_id, get_connection,
-                            submit_for_approval)
+                            submit_for_approval, get_clients, get_next_code_for_month,
+                            get_all_users, save_project)
 
 STAGES = {
     'draft': '📝 信息已填', 'confirmation_sent': '📨 确认函已发',
@@ -17,6 +18,14 @@ CLOSURE_MAP = {'active': '🟢 进行中', 'pending_payment': '🟡 待付款', 
 def page_workspace():
     st.title("📝 项目工作台")
     user = st.session_state.user
+
+    # === New project quick create ===
+    if 'show_create' not in st.session_state: st.session_state['show_create'] = False
+    if st.button("➕ 新建项目", type="primary", use_container_width=True):
+        st.session_state['show_create'] = not st.session_state['show_create']
+    if st.session_state['show_create']:
+        _quick_create_form(user)
+        st.divider()
 
     projects = get_projects(limit=300)
     show_all = st.checkbox("显示所有项目", value=(user['role'] in ('admin','finance')))
@@ -219,3 +228,50 @@ def page_workspace():
                             st.session_state['receipt_project_id'] = pid
                             st.session_state.page = "receipt"
                             st.rerun()
+
+def _quick_create_form(user):
+    """Quick project creation form."""
+    from utils.database import get_clients, get_next_code_for_month, get_all_users, save_project
+    clients = get_clients()
+    client_names = [c['short_name'] for c in clients]
+    cmap = {c['short_name']: c for c in clients}
+
+    with st.container(border=True):
+        st.subheader("➕ 快速新建项目")
+        col1, col2 = st.columns(2)
+        with col1:
+            sel = st.selectbox("客户简称 *", client_names, key="wqs_sel")
+            code = get_next_code_for_month(datetime.now().year, datetime.now().month)
+            st.text_input("项目编号 *", value=code, key="wqs_code")
+            st.text_input("项目名称 *", key="wqs_name")
+            st.text_input("品牌名 *", key="wqs_brand")
+        with col2:
+            cur = st.selectbox("币种", ["USD","RMB"], key="wqs_cur")
+            st.number_input("金额 *", min_value=0.0, step=100.0, value=None, key="wqs_amt")
+            st.date_input("到期日", value=datetime.now(), key="wqs_due")
+            users_list = get_all_users()
+            unames = [u['username'] for u in users_list]
+            st.selectbox("负责人", unames,
+                        index=unames.index(user['username']) if user['username'] in unames else 0, key="wqs_owner")
+
+        if st.button("💾 创建项目", type="primary", use_container_width=True):
+            if not all([st.session_state.get('wqs_name'), st.session_state.get('wqs_brand'), (st.session_state.get('wqs_amt') or 0) > 0]):
+                st.error("请填写所有带 * 的必填项")
+            else:
+                data = {
+                    'project_code': st.session_state.get('wqs_code',''),
+                    'project_name': st.session_state.get('wqs_name',''),
+                    'brand_name': st.session_state.get('wqs_brand',''),
+                    'amount': float(st.session_state.get('wqs_amt',0) or 0),
+                    'currency': st.session_state.get('wqs_cur','USD'),
+                    'due_date': str(st.session_state.get('wqs_due','')),
+                    'client_id': cmap.get(sel,{}).get('id'),
+                    'created_by': user['id'],
+                    'owner_name': st.session_state.get('wqs_owner', user['username']),
+                    'status': 'draft',
+                    'invoice_date': str(datetime.now().date()),
+                }
+                save_project(data)
+                st.session_state['show_create'] = False
+                st.success(f"✅ 项目已创建！")
+                st.rerun()
