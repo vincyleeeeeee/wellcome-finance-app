@@ -299,8 +299,7 @@ def _show_info(edit_data, client_names, cmap, user):
         if not code_check: errors.append("请填写项目编号")
         amt_check = st.session_state.get('ei_amt') or 0
         if not amt_check or float(amt_check) <= 0: errors.append("请填写确认函/Invoice金额")
-        period_check = st.session_state.get('ei_period','')
-        if not period_check: errors.append("请填写执行周期")
+        # Execution period is auto-generated from date pickers, skip check
         if errors:
             for e in errors: st.error(e)
             st.stop()
