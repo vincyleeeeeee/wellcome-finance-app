@@ -456,7 +456,7 @@ def _gen_invoice_dl(p):
         ws['C11']=client.get('email') or ''
         ws['E8']=p.get('project_code',''); ws['E11']=p.get('project_code','')
         ws['D15']=p.get('amount',0); ws['E15']=1; ws['G15']=p.get('amount',0)
-        ws['E9']=_fmt_date_val(p.get('invoice_date'))
+        ws['E9']=_fmt_date_val(p.get('created_at') or p.get('invoice_date'))
         ws['E10']=_fmt_date_val(p.get('due_date'))
         _write_c18(ws, p.get('amount',0), p.get('currency','USD'))
         buf=io.BytesIO(); wb.save(buf); buf.seek(0)
@@ -485,7 +485,7 @@ def _gen_stamped_only(p, output_path):
     ws['C7']=client.get('full_name',''); ws['C8']=client.get('address','')
     ws['C9']=client.get('contact',''); ws['C10']=client.get('phone') or ''
     ws['C11']=client.get('email') or ''; ws['E8']=p.get('project_code','')
-    ws['E9']=_fmt_date_val(p.get('invoice_date')); ws['E10']=_fmt_date_val(p.get('due_date'))
+    ws['E9']=_fmt_date_val(p.get('created_at') or p.get('invoice_date')); ws['E10']=_fmt_date_val(p.get('due_date'))
     ws['E11']=p.get('project_code',''); ws['D15']=p.get('amount',0); ws['E15']=1; ws['G15']=p.get('amount',0)
     _write_c18(ws, p.get('amount',0), p.get('currency','USD'))
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
@@ -508,7 +508,7 @@ def _regen_and_approve(p, user_id):
     ws['C9']=client.get('contact','')
     ws['C10']=client.get('phone') if client.get('phone') and client['phone']!='（待补充）' else None
     ws['C11']=client.get('email') if client.get('email') and client['email']!='（待补充）' else None
-    ws['E8']=p.get('project_code',''); ws['E9']=_fmt_date_val(p.get('invoice_date'))
+    ws['E8']=p.get('project_code',''); ws['E9']=_fmt_date_val(p.get('created_at') or p.get('invoice_date'))
     ws['E10']=_fmt_date_val(p.get('due_date'))
     ws['E11']=p.get('project_code',''); ws['D15']=p.get('amount',0)
     ws['E15']=1; ws['G15']=p.get('amount',0)
