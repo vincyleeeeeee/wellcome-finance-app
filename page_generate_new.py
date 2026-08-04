@@ -440,8 +440,8 @@ def _act_submit(ed, user):
             st.write(f"到期：{str(ed.get('due_date',''))[:10]}")
 
         if st.button("✅ 确认信息无误，进入提交", type="primary", use_container_width=True):
-            st.session_state['inst_total'] = inst_total
-            st.session_state['inst_cur'] = inst_cur
+            st.session_state['_inst_total'] = inst_total
+            st.session_state['_inst_cur'] = inst_cur
             st.session_state['invoice_confirmed'] = True
             st.rerun()
     else:
@@ -460,8 +460,8 @@ def _act_submit(ed, user):
         with col_submit:
             if st.button("📤 提交财务审核", type="primary", use_container_width=True):
                 note = st.session_state.get('inv_note','')
-                it = st.session_state.get('inst_total', 1) or 1
-                ic = st.session_state.get('inst_cur', 1) or 1
+                it = st.session_state.get('_inst_total', 1) or 1
+                ic = st.session_state.get('_inst_cur', 1) or 1
                 get_connection().table("projects").update({
                     "feishu_approved":f_ok, "status":"pending",
                     "amount": float(inv_amt or ed.get('amount',0)),
