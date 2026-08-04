@@ -372,10 +372,19 @@ def page_approval():
     if approved_list:
         st.subheader(f"✅ 已通过项目（{len(approved_list)}个，可下载盖章PDF）")
         for p in approved_list[:20]:
-            col1, col2 = st.columns([3,1])
+            col1, col2, col3 = st.columns([3, 1, 1])
             with col1:
-                st.write(f"**{p.get('brand_name','')}** — {p.get('project_code','')}")
+                approved_time = str(p.get('approved_at','') or '')[:19]
+                st.write(f"**{p.get('project_name','') or p.get('brand_name','')}**")
+                st.caption(f"{p.get('project_code','')} | 通过: {approved_time}")
             with col2:
+                # Finance: mark as downloaded
+                dl_key = f'downloaded_{p[\"id\"]}'
+                if dl_key not in st.session_state: st.session_state[dl_key] = False
+                if st.button("✅ 已下载" if st.session_state[dl_key] else "⬜ 未下载",
+                            key=f"dlbtn_{p['id']}", use_container_width=True):
+                    st.session_state[dl_key] = not st.session_state[dl_key]
+            with col3:
                 try:
                     stamped_path = tempfile.mktemp(suffix='.pdf')
                     _gen_stamped_only(p, stamped_path)
