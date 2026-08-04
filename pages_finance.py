@@ -375,8 +375,7 @@ def page_approval():
             col1, col2, col3 = st.columns([3, 1, 1])
             with col1:
                 approved_time = str(p.get('approved_at','') or '')[:19]
-                st.write(f"**{p.get('project_name','') or p.get('brand_name','')}**")
-                st.caption(f"{p.get('project_code','')} | 通过: {approved_time}")
+                st.write(f"**{p.get('project_name','') or p.get('brand_name','')}**  |  {p.get('project_code','')}  |  {approved_time}")
             with col2:
                 # Finance: mark as downloaded
                 pid2 = p['id']; dl_key = f'downloaded_{pid2}'
