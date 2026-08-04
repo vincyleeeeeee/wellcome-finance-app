@@ -427,6 +427,10 @@ def _act_submit(ed, user):
         inv_amount = st.number_input("本次开票金额", value=default_amt if default_amt>0 else None,
                                      step=100.0, key="inv_amt",
                                      help=f"合同总额：{ed.get('currency','USD')} {total_contract:,.2f}")
+        # Force update amount when installment changes
+        if 'inv_amt' in st.session_state and st.session_state['inv_amt'] != default_amt and inst_total > 1:
+            st.session_state['inv_amt'] = default_amt
+            st.rerun()
         inv_note = st.text_area("备注", key="inv_note", placeholder="说明本次开票内容...")
 
         c1,c2=st.columns(2)
