@@ -394,7 +394,7 @@ def page_approval():
             with c3:
                 dl_key = f"dl_{pid2}"
                 if dl_key not in st.session_state: st.session_state[dl_key] = False
-                if st.button("☑已下" if st.session_state[dl_key] else "☐未下", key=f"dlb5_{pid2}", use_container_width=True):
+                if st.button("✅已下载" if st.session_state[dl_key] else "☐未下载", key=f"dlb5_{pid2}", use_container_width=True):
                     st.session_state[dl_key] = not st.session_state[dl_key]
                     st.rerun()
     else:
@@ -481,6 +481,7 @@ def _gen_stamped_only(p, output_path):
     ws['C11']=client.get('email') or ''; ws['E8']=p.get('project_code','')
     ws['E9']=_fmt_date_val(datetime.now()); ws['E10']=_fmt_date_val(p.get('due_date'))
     ws['E11']=p.get('project_code',''); ws['D15']=p.get('amount',0); ws['E15']=1; ws['G15']=p.get('amount',0)
+    _set_c16(ws, p.get("content_type",""))
     _write_c18(ws, p.get('amount',0), p.get('currency','USD'))
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
     with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f: f.write(buf.read()); xlsx_path=f.name
@@ -506,6 +507,7 @@ def _regen_and_approve(p, user_id):
     ws['E10']=_fmt_date_val(p.get('due_date'))
     ws['E11']=p.get('project_code',''); ws['D15']=p.get('amount',0)
     ws['E15']=1; ws['G15']=p.get('amount',0)
+    _set_c16(ws, p.get("content_type",""))
     _write_c18(ws, p.get('amount',0), p.get('currency','USD'))
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
     xlsx_path=tempfile.mktemp(suffix='.xlsx')
