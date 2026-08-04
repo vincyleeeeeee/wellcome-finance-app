@@ -371,44 +371,38 @@ def page_approval():
     approved_list = [p for p in all_p if p.get('status')=='approved']
     if approved_list:
         st.subheader(f"✅ 已通过项目（{len(approved_list)}个）")
-        # Build table rows
-        table_rows = []
         for p in approved_list[:20]:
-            pid2 = p['id']; dl_key = f'downloaded_{pid2}'
+            pid2 = p['id']
             at = p.get('approved_at','')
-            if at and hasattr(at, 'strftime'): approved_time = at.strftime('%Y/%m/%d %H:%M')
-            elif at: approved_time = str(at)[:16]
-            else: approved_time = '-'
-            dl_status = "✅已下载" if st.session_state.get(dl_key, False) else "⬜未下载"
-            row = [p.get('project_name','') or p.get('brand_name',''), p.get('project_code',''), approved_time, dl_status, f'BTN_{pid2}']
-            table_rows.append(row)
+            if at:
+                if hasattr(at,'strftime'): at_str = at.strftime('%m/%d %H:%M')
+                else:
+                    try: at_str = str(at)[5:16]
+                    except: at_str = '-'
+            else: at_str = '-'
 
-        import pandas as pd
-        df = pd.DataFrame(table_rows, columns=['项目名称','编号','通过时间','下载','操作'])
-        # Show as dataframe
-        st.dataframe(df[['项目名称','编号','通过时间','下载']], use_container_width=True, hide_index=True)
-
-        # Download buttons below
-        cols = st.columns(min(len(approved_list), 4))
-        for i, p in enumerate(approved_list[:20]):
-            with cols[i % 4]:
-                pid2 = p['id']; dl_key = f'downloaded_{pid2}'
-                if st.button("⬜ 未下载" if not st.session_state.get(dl_key, False) else "✅ 已下载",
-                            key=f"dlbtn2_{p['id']}", use_container_width=True):
-                    st.session_state[dl_key] = not st.session_state.get(dl_key, False)
-                    st.rerun()
+            c1,c2,c3,c4 = st.columns([3,1.5,1,1])
+            with c1:
+                st.write(f"**{(p.get('project_name','') or p.get('brand_name',''))[:35]}**")
+                st.caption(p.get('project_code',''))
+            with c2:
+                st.caption(at_str)
+            with c3:
                 try:
                     stamped_path = tempfile.mktemp(suffix='.pdf')
                     _gen_stamped_only(p, stamped_path)
                     code_p = p.get('project_code','')
                     ms = code_p[8:10] if len(code_p)>=15 else ''
-                    M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
-                         '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
-                    fname = f"{p.get('brand_name','')}-{M.get(ms,'')}-invoice.pdf"
+                    M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
                     with open(stamped_path, 'rb') as f:
-                        st.download_button("📥 下载", f, file_name=fname, key=f"stamped2_{p['id']}", use_container_width=True)
-                except:
-                    pass
+                        st.download_button("📥", f, file_name=f"{p.get('brand_name','')}-{M.get(ms,'')}-invoice.pdf", key=f"stamped3_{pid2}")
+                except: pass
+            with c4:
+                dl_key = f"dl_{pid2}"
+                if dl_key not in st.session_state: st.session_state[dl_key] = False
+                if st.button("✓下" if st.session_state[dl_key] else "✗", key=f"dlb3_{pid2}", use_container_width=True):
+                    st.session_state[dl_key] = not st.session_state[dl_key]
+                    st.rerun()
     else:
         st.info("暂无已通过的项目")
 
