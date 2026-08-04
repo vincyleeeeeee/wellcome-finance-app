@@ -284,7 +284,7 @@ def _export_excel(projects):
 
 def page_approval():
     _inject_large_font_css()
-    st.title("⏳ 待审核")
+    st.title("📋 审核状态")
     pending = get_pending_approvals()
     user=st.session_state.user
 
@@ -370,34 +370,42 @@ def page_approval():
     all_p = get_projects(limit=100)
     approved_list = [p for p in all_p if p.get('status')=='approved']
     if approved_list:
-        st.subheader(f"✅ 已通过项目（{len(approved_list)}个，可下载盖章PDF）")
+        st.subheader(f"✅ 已通过项目（{len(approved_list)}个）")
+        # Build table rows
+        table_rows = []
         for p in approved_list[:20]:
-            col1, col2, col3 = st.columns([3, 1, 1])
-            with col1:
-                approved_time = str(p.get('approved_at','') or '')[:19]
-                st.write(f"**{p.get('project_name','') or p.get('brand_name','')}**  |  {p.get('project_code','')}  |  {approved_time}")
-            with col2:
-                # Finance: mark as downloaded
+            pid2 = p['id']; dl_key = f'downloaded_{pid2}'
+            approved_time = str(p.get('approved_at','') or '')[:19]
+            dl_status = "✅已下载" if st.session_state.get(dl_key, False) else "⬜未下载"
+            row = [p.get('project_name','') or p.get('brand_name',''), p.get('project_code',''), approved_time, dl_status, f'BTN_{pid2}']
+            table_rows.append(row)
+
+        import pandas as pd
+        df = pd.DataFrame(table_rows, columns=['项目名称','编号','通过时间','下载','操作'])
+        # Show as dataframe
+        st.dataframe(df[['项目名称','编号','通过时间','下载']], use_container_width=True, hide_index=True)
+
+        # Download buttons below
+        cols = st.columns(min(len(approved_list), 4))
+        for i, p in enumerate(approved_list[:20]):
+            with cols[i % 4]:
                 pid2 = p['id']; dl_key = f'downloaded_{pid2}'
-                if dl_key not in st.session_state: st.session_state[dl_key] = False
-                if st.button("✅ 已下载" if st.session_state[dl_key] else "⬜ 未下载",
-                            key=f"dlbtn_{p['id']}", use_container_width=True):
-                    st.session_state[dl_key] = not st.session_state[dl_key]
-            with col3:
+                if st.button("⬜ 未下载" if not st.session_state.get(dl_key, False) else "✅ 已下载",
+                            key=f"dlbtn2_{p['id']}", use_container_width=True):
+                    st.session_state[dl_key] = not st.session_state.get(dl_key, False)
+                    st.rerun()
                 try:
                     stamped_path = tempfile.mktemp(suffix='.pdf')
                     _gen_stamped_only(p, stamped_path)
-                    code = p.get('project_code','')
-                    month_str = code[8:10] if len(code)>=8 else ''
-                    MONTH_NAMES = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
-                                   '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
-                    month_name = MONTH_NAMES.get(month_str, '')
-                    fname = f"{p.get('brand_name','')}-{month_name}-invoice.pdf"
+                    code_p = p.get('project_code','')
+                    ms = code_p[8:10] if len(code_p)>=15 else ''
+                    M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
+                         '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
+                    fname = f"{p.get('brand_name','')}-{M.get(ms,'')}-invoice.pdf"
                     with open(stamped_path, 'rb') as f:
-                        st.download_button("📥 盖章发票PDF", f, file_name=fname,
-                                          key=f"stamped_{p['id']}", use_container_width=True)
+                        st.download_button("📥 下载", f, file_name=fname, key=f"stamped2_{p['id']}", use_container_width=True)
                 except:
-                    st.caption("重新生成失败")
+                    pass
     else:
         st.info("暂无已通过的项目")
 
