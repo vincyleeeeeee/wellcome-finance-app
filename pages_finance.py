@@ -375,7 +375,10 @@ def page_approval():
         table_rows = []
         for p in approved_list[:20]:
             pid2 = p['id']; dl_key = f'downloaded_{pid2}'
-            approved_time = str(p.get('approved_at','') or '')[:19]
+            at = p.get('approved_at','')
+            if at and hasattr(at, 'strftime'): approved_time = at.strftime('%Y/%m/%d %H:%M')
+            elif at: approved_time = str(at)[:16]
+            else: approved_time = '-'
             dl_status = "✅已下载" if st.session_state.get(dl_key, False) else "⬜未下载"
             row = [p.get('project_name','') or p.get('brand_name',''), p.get('project_code',''), approved_time, dl_status, f'BTN_{pid2}']
             table_rows.append(row)
