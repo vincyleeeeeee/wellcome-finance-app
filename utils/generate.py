@@ -192,7 +192,17 @@ def generate_invoice(client: dict, project: dict) -> str:
 
     # Description
     cn_amount = _amount_chinese(amount, currency)
-    ws['C16'] = "項目「   服务      」款\nltem \"Service'"
+    # Invoice type label
+    inv_type = project.get('content_type','') or ''
+    if '前款' in inv_type: svc_label = "項目【服务】前款"
+    elif '中款' in inv_type: svc_label = "項目【服务】中款"
+    elif '后款' in inv_type or '尾款' in inv_type: svc_label = "項目【服务】尾款"
+    elif '全款' in inv_type: svc_label = "項目【服务】全款"
+    elif '样品费' in inv_type: svc_label = "項目【样品费】报销"
+    elif '差旅费' in inv_type: svc_label = "項目【差旅费】报销"
+    elif '第' in inv_type and '次' in inv_type: svc_label = f"項目【服务】{inv_type.replace('服务款-','')}"
+    else: svc_label = "項目【服务】款"
+    ws['C16'] = f"{svc_label}\nltem \"Service'"
     ws['C18'] = f"總付款金額為{cn_amount}\nFull payment of {currency_label} {amount:,.2f}"
 
     # Infinix-specific: Swift Code "XXX" + underline
