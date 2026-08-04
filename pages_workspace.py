@@ -130,9 +130,12 @@ def page_workspace():
                     # Stamped confirmation (if uploaded)
                     if p.get('stamped_confirmation'):
                         import base64
+                        # Detect file type from base64 header
+                        data = p['stamped_confirmation'][:20]
+                        ext = '.png' if 'iVBOR' in data else '.pdf'
                         st.download_button("📎 盖章确认函",
                                           base64.b64decode(p['stamped_confirmation']),
-                                          file_name=f"{p.get('brand_name','')}-盖章确认函.pdf",
+                                          file_name=f"{p.get('brand_name','')}-盖章确认函{ext}",
                                           key=f"ws_sc_{pid}", use_container_width=True)
 
                     # Stamped invoice - regenerate on demand
