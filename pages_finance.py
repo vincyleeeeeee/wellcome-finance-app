@@ -379,7 +379,7 @@ def page_approval():
                 st.caption(f"{p.get('project_code','')} | 通过: {approved_time}")
             with col2:
                 # Finance: mark as downloaded
-                dl_key = f'downloaded_{p[\"id\"]}'
+                pid2 = p['id']; dl_key = f'downloaded_{pid2}'
                 if dl_key not in st.session_state: st.session_state[dl_key] = False
                 if st.button("✅ 已下载" if st.session_state[dl_key] else "⬜ 未下载",
                             key=f"dlbtn_{p['id']}", use_container_width=True):
