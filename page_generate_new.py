@@ -405,13 +405,28 @@ def _act_submit(ed, user):
         st.success("✅ 条件满足，请核对信息并补充")
         client = get_client_by_id(ed.get('client_id')) or {}
 
-        # Invoice type
-        inv_type = st.selectbox("发票类型", ["服务款-全款","服务款-前款","服务款-中款","服务款-后款","样品费报销","差旅费报销"],
-                               key="inv_type")
-        default_amt = float(ed.get('amount',0))
+        # Split payment
+        total_contract = float(ed.get('amount',0))
+        inst_total = st.selectbox("分几次付款", [1,2,3,4,5], key="inst_total",
+                                  help="全款选1，分两次选2")
+        if inst_total > 1:
+            inst_cur = st.selectbox("本次是第几次", list(range(1, inst_total+1)), key="inst_cur")
+            inst_amt = round(total_contract / inst_total, 2)
+            st.info(f"本次金额：**{ed.get('currency','USD')} {inst_amt:,.2f}** | 第{inst_cur}次/共{inst_total}次")
+            default_amt = inst_amt
+            inv_type_default = f"服务款-第{inst_cur}次款项"
+        else:
+            inst_cur = 1
+            inst_amt = total_contract
+            default_amt = total_contract
+            inv_type_default = "服务款-全款"
+
+        inv_type = st.selectbox("发票类型",
+                               ["服务款-全款","服务款-前款","服务款-中款","服务款-后款","样品费报销","差旅费报销"],
+                               index=0, key="inv_type")
         inv_amount = st.number_input("本次开票金额", value=default_amt if default_amt>0 else None,
                                      step=100.0, key="inv_amt",
-                                     help=f"合同总额：{ed.get('currency','USD')} {ed.get('amount',0):,.2f}")
+                                     help=f"合同总额：{ed.get('currency','USD')} {total_contract:,.2f}")
         inv_note = st.text_area("备注", key="inv_note", placeholder="说明本次开票内容...")
 
         c1,c2=st.columns(2)
@@ -447,6 +462,8 @@ def _act_submit(ed, user):
                     "feishu_approved":f_ok, "status":"pending",
                     "amount": float(inv_amt or ed.get('amount',0)),
                     "content_type": inv_type + (f" [{note}]" if note else ""),
+                    "installment_total": inst_total,
+                    "installment_current": inst_cur,
                 }).eq("id",ed['id']).execute()
                 st.session_state['invoice_confirmed'] = False
                 st.success(f"✅ {inv_type} 已提交！等待财务审核。")
