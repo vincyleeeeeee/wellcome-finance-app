@@ -190,7 +190,7 @@ def render_sidebar():
             st.divider()
             st.markdown("**💰 财务专区**")
             p = len(get_pending_approvals())
-            al = f"⏳ 待审核" + (f" ({p})" if p else "")
+            al = f"📋 审核状态" + (f" ({p})" if p else "")
             st.button("📊 项目总览", use_container_width=True,
                       type="primary" if cur == "overview" else "secondary",
                       on_click=_nav_to, args=("overview",))
