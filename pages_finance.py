@@ -373,36 +373,24 @@ def page_approval():
         st.subheader(f"✅ 已通过项目（{len(approved_list)}个）")
         for p in approved_list[:20]:
             pid2 = p['id']
-            at = p.get('approved_at','')
-            if at:
-                if hasattr(at,'strftime'): at_str = at.strftime('%m/%d %H:%M')
-                else:
-                    try: at_str = str(at)[5:16]
-                    except: at_str = '-'
-            else: at_str = '-'
+            name = (p.get('project_name','') or p.get('brand_name',''))[:50]
+            code = p.get('project_code','')
 
-            c1,c2,c3,c4 = st.columns([3,1.5,1,1])
+            c1,c2 = st.columns([4,1])
             with c1:
-                st.write(f"**{(p.get('project_name','') or p.get('brand_name',''))[:35]}**")
-                st.caption(p.get('project_code',''))
+                st.write(f"**{name}**  |  {code}")
             with c2:
-                st.caption(at_str)
-            with c3:
                 try:
                     stamped_path = tempfile.mktemp(suffix='.pdf')
                     _gen_stamped_only(p, stamped_path)
-                    code_p = p.get('project_code','')
-                    ms = code_p[8:10] if len(code_p)>=15 else ''
-                    M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
+                    ms = code[8:10] if len(code)>=15 else ''
+                    M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
+                         '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
                     with open(stamped_path, 'rb') as f:
-                        st.download_button("📥", f, file_name=f"{p.get('brand_name','')}-{M.get(ms,'')}-invoice.pdf", key=f"stamped3_{pid2}")
+                        st.download_button("📥 下载盖章发票", f,
+                                          file_name=f"{p.get('brand_name','')}-{M.get(ms,'')}-invoice.pdf",
+                                          key=f"stamped4_{pid2}", use_container_width=True)
                 except: pass
-            with c4:
-                dl_key = f"dl_{pid2}"
-                if dl_key not in st.session_state: st.session_state[dl_key] = False
-                if st.button("✓下" if st.session_state[dl_key] else "✗", key=f"dlb3_{pid2}", use_container_width=True):
-                    st.session_state[dl_key] = not st.session_state[dl_key]
-                    st.rerun()
     else:
         st.info("暂无已通过的项目")
 
