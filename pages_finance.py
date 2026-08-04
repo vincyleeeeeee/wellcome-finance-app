@@ -371,26 +371,53 @@ def page_approval():
     approved_list = [p for p in all_p if p.get('status')=='approved']
     if approved_list:
         st.subheader(f"✅ 已通过项目（{len(approved_list)}个）")
-        for p in approved_list[:20]:
+        import pandas as pd
+        rows = []
+        for p in approved_list[:30]:
             pid2 = p['id']
             name = (p.get('project_name','') or p.get('brand_name',''))[:50]
             code = p.get('project_code','')
+            at = p.get('approved_at','')
+            if at and hasattr(at,'strftime'): at_str = at.strftime('%m/%d %H:%M')
+            elif at:
+                try: at_str = str(at)[5:16]
+                except: at_str = '-'
+            else: at_str = '-'
+            dl_key = f"dl_{pid2}"
+            dl_status = '✅' if st.session_state.get(dl_key, False) else '⬜'
+            rows.append({'项目名称': name, '编号': code, '通过时间': at_str, '已下载': dl_status, '_pid': pid2, '_code': code})
 
-            c1,c2 = st.columns([4,1])
-            with c1:
-                st.write(f"**{name}**  |  {code}")
-            with c2:
-                try:
-                    stamped_path = tempfile.mktemp(suffix='.pdf')
-                    _gen_stamped_only(p, stamped_path)
-                    ms = code[8:10] if len(code)>=15 else ''
+        df = pd.DataFrame(rows)
+        st.dataframe(df[['项目名称','编号','通过时间','已下载']], use_container_width=True, hide_index=True)
+
+        # Download + mark buttons in a clean row below
+        col1,col2 = st.columns(2)
+        with col1:
+            sel_pid = st.selectbox("选择项目下载", [f"{r['编号']} - {r['项目名称'][:30]}" for r in rows], key="ap_sel")
+        with col2:
+            sel_row = rows[[f"{r['编号']} - {r['项目名称'][:30]}" for r in rows].index(sel_pid)]
+            sel_p = sel_row
+            try:
+                pid3 = sel_p['_pid']; code3 = sel_p['_code']
+                stamped_path = tempfile.mktemp(suffix='.pdf')
+                from utils.database import get_project_by_id
+                proj_full = get_project_by_id(pid3)
+                if proj_full:
+                    _gen_stamped_only(proj_full, stamped_path)
+                    ms = code3[8:10] if len(code3)>=15 else ''
                     M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
                          '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
                     with open(stamped_path, 'rb') as f:
                         st.download_button("📥 下载盖章发票", f,
-                                          file_name=f"{p.get('brand_name','')}-{M.get(ms,'')}-invoice.pdf",
-                                          key=f"stamped4_{pid2}", use_container_width=True)
-                except: pass
+                                          file_name=f"{proj_full.get('brand_name','')}-{M.get(ms,'')}-invoice.pdf",
+                                          key="stamped5", use_container_width=True)
+                # Mark as downloaded
+                dl_key2 = f"dl_{pid3}"
+                if dl_key2 not in st.session_state: st.session_state[dl_key2] = False
+                if st.button("✅ 标记已下载" if not st.session_state[dl_key2] else "⬜ 取消已下载", key="mk_dl", use_container_width=True):
+                    st.session_state[dl_key2] = not st.session_state[dl_key2]
+                    st.rerun()
+            except: pass
     else:
         st.info("暂无已通过的项目")
 
