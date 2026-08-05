@@ -455,7 +455,7 @@ def _set_c16(ws, content_type):
     elif '全款' in ct: label = "項目【服务】全款"
     elif '样品费' in ct: label = "項目【样品费】报销"
     elif '差旅费' in ct: label = "項目【差旅费】报销"
-    elif '第' in ct and '次' in ct: label = f"項目【服务】{ct.replace('服务款-','')}"
+    elif '第' in ct and '次' in ct: label = "項目【服务】分期款"
     else: label = "項目【服务】款"
     ws['C16'] = f"{label}\nltem \"Service'"
 
