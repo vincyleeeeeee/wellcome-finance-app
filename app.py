@@ -15,7 +15,7 @@ from utils.database import (
     upsert_client, delete_client,
     save_project, get_projects, get_project_by_id,
     submit_for_approval, approve_project, reject_project, get_pending_approvals,
-    set_user_role, generate_project_code, get_next_code_for_month
+    set_user_role, generate_project_code
 )
 from utils.generate import (
     generate_confirmation_letter, generate_invoice,
@@ -456,26 +456,12 @@ def _page_generate_placeholder():
         st.caption(f"📋 {client_info['full_name']}  |  联系人: {client_info['contact']}  |  {phone_email}")
 
         application_date = st.date_input("申请日期 *", value=datetime.now())
-        # Month selector for project code
-        col_month, col_show = st.columns([1, 2])
-        with col_month:
-            code_month = st.selectbox("编号月份", list(range(1, 13)),
-                                      index=datetime.now().month - 1,
-                                      format_func=lambda m: f"{m}月",
-                                      help="选月份查看该月最新编号")
-            code_year = datetime.now().year
-            if code_month < datetime.now().month:
-                code_year += 1  # if user selects earlier month, assume next year
-        with col_show:
-            if edit_data and edit_data.get('project_code'):
-                project_code = st.text_input("项目编号 *", value=edit_data['project_code'])
-            else:
-                try:
-                    latest = get_next_code_for_month(code_year, code_month)
-                    st.success(f"📝 **{code_month}月** 下一个可用编号：**{latest}**（实时，不会重复）")
-                except Exception:
-                    latest = f"WELL{code_year % 100:02d}{code_month:02d}01XX"
-                project_code = st.text_input("项目编号 *", value=latest, help="自动生成，可直接修改")
+        if edit_data and edit_data.get('project_code'):
+            project_code = st.text_input("项目编号", value=edit_data['project_code'])
+        else:
+            project_code = st.text_input("项目编号", value="",
+                                        placeholder="留空，开发票时按当天日期自动分配",
+                                        help="可不填，审核通过开发票时会自动生成")
         project_name = st.text_input("项目名称 *", value=edit_data.get('project_name','') if edit_data else '',
                                      placeholder="品牌名 – 月份UGC 篇数")
         brand_name = st.text_input("客户品牌名 *", value=edit_data.get('brand_name','') if edit_data else '',
@@ -1141,10 +1127,17 @@ def _receipt_form(client, project):
         payment_date = st.date_input("付款日期", value=datetime.now())
         gained_date = st.date_input("到款日期", value=datetime.now())
         payment_method = st.selectbox("付款方式", ["BANK", "CASH", "TRANSFER"])
+        # Use receipt_amount from session if coming from payment flow
+        receipt_amt = st.session_state.pop('receipt_amount', None)
+        receipt_cur = st.session_state.pop('receipt_currency', None)
+        if receipt_amt is not None:
+            def_pay_amt = float(receipt_amt)
+        else:
+            def_pay_amt = float(default_amount) if default_amount > 0 else None
         payment_amount = st.number_input("实收金额", min_value=0.0,
-                                         value=float(default_amount) if default_amount > 0 else None, step=100.0)
+                                         value=def_pay_amt, step=100.0)
         currency = st.selectbox("币种", ["USD", "RMB"],
-                                index=0 if default_currency == "USD" else 1)
+                                index=0 if (receipt_cur or default_currency) in ("USD", None) else 1)
 
     st.divider()
     if st.button("🧾 生成收据并盖章", type="primary", use_container_width=True):

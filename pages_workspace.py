@@ -4,7 +4,7 @@ import streamlit as st
 import os
 from datetime import datetime
 from utils.database import (get_projects, get_client_by_id, get_connection,
-                            submit_for_approval, get_clients, get_next_code_for_month,
+                            submit_for_approval, get_clients,
                             get_all_users, save_project)
 
 STAGES = {
@@ -85,7 +85,11 @@ def page_workspace():
     for p in projects:
         stage = STAGES.get(p.get('status','draft'), '❓')
         closure = CLOSURE_MAP.get(p.get('closure_status','active') or 'active', '')
-        paid = ' 💰已到账' if p.get('payment_received') else ''
+        rcvd = p.get('received_amount', 0) or 0
+        total = p.get('amount', 0)
+        if p.get('payment_received'): paid = ' 💰已到账'
+        elif rcvd > 0: paid = f' 💵到账{rcvd/total*100:.0f}%'
+        else: paid = ''
 
         with st.container(border=True):
             # Checkbox + basic info
@@ -98,7 +102,8 @@ def page_workspace():
                 else:
                     sel.discard(pid)
             with cc1:
-                st.write(f"{stage}{paid} **{p.get('brand_name','')}** — {p.get('project_code','')}")
+                code_display = p.get('project_code','') or '（待分配编号）'
+                st.write(f"{stage}{paid} **{p.get('brand_name','')}** — {code_display}")
                 st.caption(f"{p.get('currency','USD')} {p.get('amount',0):,.2f} | {p.get('client_short','')} | 👤 {p.get('owner_name','') or '未指定'} | {closure} | {(p.get('created_at','') or '')[:10]}")
             with cc2:
                 # Download buttons based on stage
@@ -153,15 +158,16 @@ def page_workspace():
                         try: _os.unlink(tmp)
                         except: pass
 
-                    # Receipt (if paid)
-                    if p.get('payment_received'):
+                    # Receipt (if any payment received)
+                    if (p.get('received_amount', 0) or 0) > 0:
                         from utils.receipt_pdf import generate_receipt_pdf
                         import tempfile, os as _os2
                         client2 = get_client_by_id(p.get('client_id')) or {}
+                        rcvd_amt = p.get('received_amount', 0) or 0
                         rd = {'project_name':p.get('project_name',''),'project_code':p.get('project_code',''),
                               'brand_name':p.get('brand_name',''),'amount':p.get('amount',0),
                               'currency':p.get('currency','USD'),'venue':p.get('venue',''),
-                              'payment_amount':p.get('amount',0),'payment_date':datetime.now(),
+                              'payment_amount':rcvd_amt,'payment_date':datetime.now(),
                               'gained_date':datetime.now(),'payment_method':'BANK',
                               'issuer_name':'Mr. Terry.Su','project_date':p.get('execution_period',''),
                               'client_short':p.get('client_short','')}
@@ -222,19 +228,29 @@ def page_workspace():
                             }).eq("id", pid).execute()
                             st.success("已保存"); st.rerun()
                     # Mark paid → auto receipt flow
+                    # Mark payment (full or partial)
                     if p.get('status') == 'approved' and not p.get('payment_received') and user['role'] in ('finance','admin'):
-                        if st.button("💰 标记到账并开收据", key=f"wsp_{pid}", use_container_width=True):
+                        already = p.get('received_amount', 0) or 0
+                        remaining = p.get('amount', 0) - already
+                        wsp_key = f"wsp_amt_{pid}"
+                        st.number_input("本次到账金额", min_value=0.0, max_value=float(remaining),
+                                       value=float(remaining), step=100.0, key=wsp_key)
+                        if st.button("💰 确认到账并开收据", key=f"wsp_{pid}", use_container_width=True):
+                            pay_amt = st.session_state.get(wsp_key, remaining) or remaining
+                            new_total = already + pay_amt
                             get_connection().table("projects").update({
-                                "payment_received": True,
+                                "received_amount": new_total,
+                                "payment_received": new_total >= p.get('amount', 0),
                                 "received_date": datetime.now().strftime('%Y-%m-%d'),
                             }).eq("id", pid).execute()
                             st.session_state['receipt_project_id'] = pid
+                            st.session_state['receipt_amount'] = pay_amt
                             st.session_state.page = "receipt"
                             st.rerun()
 
 def _quick_create_form(user):
     """Quick project creation form."""
-    from utils.database import get_clients, get_next_code_for_month, get_all_users, save_project
+    from utils.database import get_clients, get_all_users, save_project
     clients = get_clients()
     client_names = [c['short_name'] for c in clients]
     cmap = {c['short_name']: c for c in clients}
@@ -244,8 +260,8 @@ def _quick_create_form(user):
         col1, col2 = st.columns(2)
         with col1:
             sel = st.selectbox("客户简称 *", client_names, key="wqs_sel")
-            code = get_next_code_for_month(datetime.now().year, datetime.now().month)
-            st.text_input("项目编号 *", value=code, key="wqs_code")
+            st.text_input("项目编号", value="", key="wqs_code",
+                         placeholder="留空，开发票时自动生成")
             st.text_input("项目名称 *", key="wqs_name")
             st.text_input("品牌名 *", key="wqs_brand")
         with col2:

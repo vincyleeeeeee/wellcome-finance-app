@@ -215,7 +215,7 @@ def save_project(project_data: dict) -> int:
 
 def get_projects(limit: int = 50, status: str = None) -> List[Dict]:
     sb = _get_sb()
-    query = sb.table("projects").select("*, clients(short_name, full_name)").order("created_at").limit(limit)
+    query = sb.table("projects").select("*, clients(short_name, full_name)").order("created_at", desc=True).limit(limit)
     if status:
         query = query.eq("status", status)
     result = query.execute()
@@ -287,9 +287,8 @@ def get_pending_approvals() -> List[Dict]:
 # ============================================================
 def generate_project_code(code_date: str) -> str:
     """
-    Generate next project code: WELL + YYMMDD + XX (2-digit sequence).
-    code_date: 'YYYY-MM-DD' format.
-    Returns: e.g., 'WELL26071501'
+    Generate next project code: WELL + YYYYMMDD + 3-digit daily sequence.
+    code_date: 'YYYY-MM-DD' format (e.g., '2026-08-11' → 'WELL20260811001').
     """
     sb = _get_sb()
     from datetime import datetime as dt

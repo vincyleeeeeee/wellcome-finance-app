@@ -81,29 +81,35 @@ def page_overview():
     # Summary cards
     pending_count = sum(1 for p in projects if p.get('status') == 'pending')
     approved_count = sum(1 for p in projects if p.get('status') == 'approved')
-    received_count = sum(1 for p in projects if p.get('payment_received'))
+    received_full = sum(1 for p in projects if p.get('payment_received'))
+    received_partial = sum(1 for p in projects if not p.get('payment_received') and (p.get('received_amount', 0) or 0) > 0)
     closed_count = sum(1 for p in projects if p.get('closure_status') == 'closed')
     total_cost = sum(p.get('estimated_cost',0) or 0 for p in projects)
     total_revenue = sum(p.get('amount',0) or 0 for p in projects)
-    need_receipt = sum(1 for p in projects if p.get('payment_received') and p.get('status')=='approved')
-    c1,c2,c3,c4,c5,c6,c7 = st.columns(7)
+    total_received = sum((p.get('received_amount', 0) or 0) for p in projects)
+    need_receipt = sum(1 for p in projects if (p.get('received_amount', 0) or 0) > 0 and p.get('status')=='approved')
+    c1,c2,c3,c4,c5,c6,c7,c8 = st.columns(8)
     c1.metric("⏳ 待审核", pending_count)
     c2.metric("✅ 已开发票", approved_count)
-    c3.metric("💰 已到账", received_count)
-    c4.metric("🧾 待开收据", need_receipt)
-    c5.metric("🔒 已结案", closed_count)
-    c6.metric("💸 总成本", f"¥{total_cost:,.0f}")
-    c7.metric("📈 总收入", f"${total_revenue:,.0f}")
+    c3.metric("💰 已到账", received_full)
+    c4.metric("💵 部分到账", received_partial)
+    c5.metric("🧾 待开收据", need_receipt)
+    c6.metric("🔒 已结案", closed_count)
+    c7.metric("💸 总成本", f"¥{total_cost:,.0f}")
+    c8.metric("📈 总收入", f"${total_revenue:,.0f}")
 
-    # Quick action: projects needing receipt
-    need_rec_projects = [p for p in projects if p.get('payment_received') and p.get('status')=='approved']
+    # Quick action: projects needing receipt (any received amount > 0)
+    need_rec_projects = [p for p in projects if (p.get('received_amount', 0) or 0) > 0 and p.get('status')=='approved']
     if need_rec_projects:
         st.divider()
         st.subheader("🧾 待开收据项目")
         for p in need_rec_projects[:5]:
             c1,c2 = st.columns([4,1])
             with c1:
-                st.write(f"**{p.get('brand_name','')}** — {p.get('project_code','')} | {p.get('currency','USD')} {p.get('amount',0):,.0f}")
+                rcvd = p.get('received_amount', 0) or 0
+                total = p.get('amount', 0)
+                pct = f"({rcvd/total*100:.0f}%)" if total > 0 else ""
+                st.write(f"**{p.get('brand_name','')}** — {p.get('project_code','')} | 已到账 {p.get('currency','USD')} {rcvd:,.0f} / {total:,.0f} {pct}")
             with c2:
                 if st.button("🧾 开收据", key=f"rec_{p['id']}", use_container_width=True):
                     st.session_state['receipt_project_id'] = p['id']
@@ -125,7 +131,12 @@ def _render_table(projects):
     for p in projects:
         stage = STAGE_MAP.get(p.get('status', ''), p.get('status', '?'))
         closure = CLOSURE_MAP.get(p.get('closure_status', 'active'), '')
-        paid = '✅' if p.get('payment_received') else ''
+        rcvd = p.get('received_amount', 0) or 0
+        if p.get('payment_received'): paid = '✅ 全款'
+        elif rcvd > 0:
+            total = p.get('amount', 1) or 1
+            paid = f'💵 {rcvd/total*100:.0f}%'
+        else: paid = ''
         feishu = '是' if p.get('feishu_approved') else '否'
         total_cost = p.get('estimated_cost',0) or 0
         exec_period = _fmt_exec(p.get('execution_period','') or '')
@@ -199,23 +210,47 @@ def _render_table(projects):
     st.markdown(html, unsafe_allow_html=True)
 
 
-    # Quick action: mark as paid for approved but unpaid projects
+    # Quick action: mark payment for approved projects (including partial)
     st.divider()
-    unpaid = [p for p in projects if p.get('status')=='approved' and not p.get('payment_received')]
-    if unpaid:
+    not_full = [p for p in projects if p.get('status')=='approved' and not p.get('payment_received')]
+    if not_full:
         st.subheader("💰 到账操作")
-        cols = st.columns(min(len(unpaid), 5))
-        for i, p in enumerate(unpaid[:10]):
-            with cols[i % 5]:
-                with st.container(border=True):
-                    st.caption(f"**{p.get('brand_name','')}**")
-                    st.caption(f"{p.get('project_code','')}")
-                    if st.button("✅ 标记到账", key=f"paid_quick_{p['id']}", use_container_width=True):
+        for p in not_full[:20]:
+            pid_key = f"paid_amt_{p['id']}"
+            total_amt = p.get('amount', 0)
+            already_rcvd = p.get('received_amount', 0) or 0
+            remaining = total_amt - already_rcvd
+
+            with st.container(border=True):
+                c1, c2, c3, c4 = st.columns([3, 1.5, 1.5, 1.5])
+                with c1:
+                    pct = f"（已到 {already_rcvd:,.0f} / {total_amt:,.0f}）" if already_rcvd > 0 else ""
+                    st.write(f"**{p.get('brand_name','')}** {pct}")
+                    code_show = p.get('project_code','') or '（待分配）'
+                    st.caption(f"{code_show} | {p.get('currency','USD')} {total_amt:,.0f}")
+                with c2:
+                    amt = st.number_input("本次到账", min_value=0.0, max_value=float(remaining),
+                                         value=float(remaining), step=100.0,
+                                         key=f"{pid_key}_input",
+                                         label_visibility="collapsed")
+                with c3:
+                    cur = st.selectbox("币种", ["USD", "RMB"],
+                                      index=0 if p.get('currency','USD')=='USD' else 1,
+                                      key=f"{pid_key}_cur", label_visibility="collapsed")
+                with c4:
+                    if st.button("✅ 确认到账", key=f"paid_{pid_key}", use_container_width=True):
+                        new_total = already_rcvd + amt
                         from utils.database import get_connection
                         get_connection().table("projects").update({
-                            "payment_received": True,
+                            "received_amount": new_total,
+                            "payment_received": new_total >= total_amt,
                             "received_date": datetime.now().strftime('%Y-%m-%d'),
                         }).eq("id", p['id']).execute()
+                        # Store receipt info and jump to receipt page
+                        st.session_state['receipt_project_id'] = p['id']
+                        st.session_state['receipt_amount'] = amt
+                        st.session_state['receipt_currency'] = cur
+                        st.session_state.page = "receipt"
                         st.rerun()
 
 
@@ -232,7 +267,10 @@ def _export_excel(projects):
     for p in projects:
         stage=STAGE_MAP.get(p.get('status',''),'')
         closure=CLOSURE_MAP.get(p.get('closure_status',''),'')
-        paid='是' if p.get('payment_received') else '否'
+        rcvd_amt = p.get('received_amount', 0) or 0
+        if p.get('payment_received'): paid = '是'
+        elif rcvd_amt > 0: paid = f'{rcvd_amt/p.get("amount", 1)*100:.0f}%'
+        else: paid = '否'
         try: items=json.loads(p.get('cost_breakdown','') or '[]')
         except: items=[]
         start_row = row
@@ -426,14 +464,23 @@ def _gen_invoice_dl(p):
     try:
         import openpyxl as xl
         from utils.generate import TEMPLATE_DIR as TD
+        from utils.database import generate_project_code, get_connection
         client=get_client_by_id(p.get('client_id')) or {}
         if not client: return
+
+        # Auto-assign code if empty (preview before approval)
+        code = p.get('project_code','')
+        if not code:
+            code = generate_project_code(datetime.now().strftime('%Y-%m-%d'))
+            get_connection().table("projects").update({"project_code": code}).eq("id", p['id']).execute()
+            p['project_code'] = code
+
         wb=xl.load_workbook(os.path.join(TD,"Invoice-Template.xlsx")); ws=wb.active
         ws['C3']=f"{p.get('brand_name','')} – {p.get('total_posts','')} CONTENT PACKAGE"
         ws['C7']=client.get('full_name',''); ws['C8']=client.get('address','')
         ws['C9']=client.get('contact',''); ws['C10']=client.get('phone') or ''
         ws['C11']=client.get('email') or ''
-        ws['E8']=p.get('project_code',''); ws['E11']=p.get('project_code','')
+        ws['E8']=code; ws['E11']=code
         ws['D15']=p.get('amount',0); ws['E15']=1; ws['G15']=p.get('amount',0)
         ws['E9']=_fmt_date_val(datetime.now())
         ws['E10']=_fmt_date_val(p.get('due_date'))
@@ -473,14 +520,22 @@ def _gen_stamped_only(p, output_path):
     import openpyxl as xl
     from utils.pdf_utils import generate_stamped_pdf
     from utils.generate import TEMPLATE_DIR as TD
+    from utils.database import generate_project_code, get_connection
+
+    # Safety: auto-assign code if somehow still empty
+    code = p.get('project_code','')
+    if not code:
+        code = generate_project_code(datetime.now().strftime('%Y-%m-%d'))
+        get_connection().table("projects").update({"project_code": code}).eq("id", p['id']).execute()
+
     client=get_client_by_id(p.get('client_id')) or {}
     wb=xl.load_workbook(os.path.join(TD,"Invoice-Template.xlsx")); ws=wb.active
     ws['C3']=f"{p.get('brand_name','')} – {p.get('total_posts','')} CONTENT PACKAGE"
     ws['C7']=client.get('full_name',''); ws['C8']=client.get('address','')
     ws['C9']=client.get('contact',''); ws['C10']=client.get('phone') or ''
-    ws['C11']=client.get('email') or ''; ws['E8']=p.get('project_code','')
+    ws['C11']=client.get('email') or ''; ws['E8']=code
     ws['E9']=_fmt_date_val(datetime.now()); ws['E10']=_fmt_date_val(p.get('due_date'))
-    ws['E11']=p.get('project_code',''); ws['D15']=p.get('amount',0); ws['E15']=1; ws['G15']=p.get('amount',0)
+    ws['E11']=code; ws['D15']=p.get('amount',0); ws['E15']=1; ws['G15']=p.get('amount',0)
     _set_c16(ws, p.get("content_type",""))
     _write_c18(ws, p.get('amount',0), p.get('currency','USD'))
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
@@ -496,6 +551,15 @@ def _regen_and_approve(p, user_id):
     import openpyxl as xl
     from utils.pdf_utils import generate_stamped_pdf
     from utils.generate import TEMPLATE_DIR as TD
+    from utils.database import generate_project_code, get_connection
+
+    # Auto-assign project code based on today if still empty
+    code = p.get('project_code','')
+    if not code:
+        code = generate_project_code(datetime.now().strftime('%Y-%m-%d'))
+        get_connection().table("projects").update({"project_code": code}).eq("id", p['id']).execute()
+        p['project_code'] = code
+
     client=get_client_by_id(p.get('client_id')) or {}
     wb=xl.load_workbook(os.path.join(TD,"Invoice-Template.xlsx")); ws=wb.active
     ws['C3']=f"{p.get('brand_name','')} – {p.get('total_posts','')} CONTENT PACKAGE"
@@ -503,9 +567,9 @@ def _regen_and_approve(p, user_id):
     ws['C9']=client.get('contact','')
     ws['C10']=client.get('phone') if client.get('phone') and client['phone']!='（待补充）' else None
     ws['C11']=client.get('email') if client.get('email') and client['email']!='（待补充）' else None
-    ws['E8']=p.get('project_code',''); ws['E9']=_fmt_date_val(datetime.now())
+    ws['E8']=code; ws['E9']=_fmt_date_val(datetime.now())
     ws['E10']=_fmt_date_val(p.get('due_date'))
-    ws['E11']=p.get('project_code',''); ws['D15']=p.get('amount',0)
+    ws['E11']=code; ws['D15']=p.get('amount',0)
     ws['E15']=1; ws['G15']=p.get('amount',0)
     _set_c16(ws, p.get("content_type",""))
     _write_c18(ws, p.get('amount',0), p.get('currency','USD'))

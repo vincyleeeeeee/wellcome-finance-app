@@ -4,7 +4,7 @@ import streamlit as st
 from datetime import datetime
 import os, json, base64
 from utils.database import (get_clients, get_client_by_id, get_project_by_id,
-                            save_project, get_next_code_for_month, get_all_users,
+                            save_project, get_all_users,
                             get_connection)
 from utils.generate import (generate_confirmation_letter, generate_invoice,
                             generate_email_confirmation)
@@ -75,11 +75,8 @@ def _quick_create(client_names, cmap, user):
         col1, col2 = st.columns(2)
         with col1:
             sel = st.selectbox("客户简称", client_names, key="qc_sel")
-            qc_month = st.selectbox("编号月份", list(range(1,13)), index=datetime.now().month-1,
-                                    format_func=lambda m:f"{m}月", key="qc_month")
-            code = get_next_code_for_month(datetime.now().year, qc_month)
-            st.success(f"📝 {qc_month}月下一个可用编号：**{code}**")
-            st.text_input("项目编号", value=code, key="qc_code")
+            st.text_input("项目编号（开发票时自动分配）", value="", key="qc_code",
+                          placeholder="留空，开发票时自动生成")
             st.text_input("项目名称 *", key="qc_name",
                           placeholder="laclef_202606_公寓测评_小红书KOL_4")
             st.caption("格式：品牌_年月_产品类型_小红书UGC/小红书KOL_数量")
@@ -158,37 +155,10 @@ def _show_info(edit_data, client_names, cmap, user):
         dow = unames.index(owner_name) if owner_name in unames else 0
         st.selectbox("负责人", unames, index=dow, key="ei_owner")
 
-        # Project code with month selector
-        from utils.database import get_next_code_for_month
-        # Get month from existing code if available, else current month
+        # Project code — no longer auto-generated at creation; assigned at invoice time
         existing_code = edit_data.get('project_code','')
-        default_month = datetime.now().month
-        if existing_code and len(existing_code) >= 8:
-            try:
-                if len(existing_code) >= 15:  # old format WELL20260717012
-                    default_month = int(existing_code[8:10])
-                else:  # new format WELL260801001
-                    default_month = int(existing_code[8:10])
-            except: pass
-        cm = st.selectbox("编号月份", list(range(1,13)),
-                          index=default_month-1,
-                          format_func=lambda m:f"{m}月", key="ei_month")
-        if edit_data.get('project_code'):
-            # Editing existing → keep original code
-            default_code = edit_data['project_code']
-        else:
-            # New project → show next available
-            next_code = get_next_code_for_month(datetime.now().year, cm)
-            default_code = next_code
-            st.success(f"📝 {cm}月下一个可用编号：**{next_code}**")
-        # Only set default if user hasn't manually edited
-        if 'ei_last_month' not in st.session_state:
-            st.session_state['ei_last_month'] = cm
-        month_changed = st.session_state['ei_last_month'] != cm
-        if month_changed:
-            st.session_state['ei_code'] = default_code
-            st.session_state['ei_last_month'] = cm
-        st.text_input("项目编号", value=st.session_state.get('ei_code', default_code), key="ei_code")
+        st.text_input("项目编号", value=existing_code, key="ei_code",
+                      placeholder="留空，开发票时按当天日期自动分配")
         st.text_input("项目名称", value=edit_data.get('project_name',''), key="ei_name",
                       placeholder="laclef_202606_公寓测评_小红书KOL_4")
         st.caption("格式：品牌_年月_产品类型_小红书UGC/小红书KOL_数量")
@@ -392,7 +362,6 @@ def _act_submit(ed, user):
     errs = []
     if not ed.get('stamped_confirmation'): errs.append("❌ 未上传盖章确认函")
     if not ed.get('estimated_cost'): errs.append("❌ 成本构成为空")
-    if not ed.get('project_code'): errs.append("❌ 项目编号为空，请先填写并保存基本信息")
     if errs:
         for e in errs: st.error(e)
         return
