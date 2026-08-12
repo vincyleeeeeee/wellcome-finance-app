@@ -215,7 +215,7 @@ def save_project(project_data: dict) -> int:
 
 def get_projects(limit: int = 50, status: str = None) -> List[Dict]:
     sb = _get_sb()
-    query = sb.table("projects").select("*, clients(short_name, full_name)").order("created_at", desc=True).limit(limit)
+    query = sb.table("projects").select("*, clients(short_name, full_name)").order("project_code", desc=True).limit(limit)
     if status:
         query = query.eq("status", status)
     result = query.execute()
@@ -224,6 +224,13 @@ def get_projects(limit: int = 50, status: str = None) -> List[Dict]:
         if p.get("clients"):
             p["client_short"] = p["clients"]["short_name"] if isinstance(p["clients"], dict) else ""
             p["client_full"] = p["clients"]["full_name"] if isinstance(p["clients"], dict) else ""
+    # Sort: Zeeker always first, then by code desc, empty codes last
+    def _sort_key(p):
+        code = p.get('project_code','') or ''
+        if 'ZK' in code: return (0, '')  # Zeeker on top
+        if not code: return (2, '')       # empty codes at bottom
+        return (1, code)                  # normal codes descending
+    data.sort(key=_sort_key)
     return data
 
 
@@ -305,14 +312,17 @@ def get_pending_approvals() -> List[Dict]:
 # ============================================================
 def generate_project_code(code_date: str) -> str:
     """
-    Generate next project code: WELL + YYYYMMDD + 3-digit daily sequence.
-    code_date: 'YYYY-MM-DD' format (e.g., '2026-08-11' → 'WELL20260811001').
+    Generate next project code: WELL + YYYYMMDD + 3-digit monthly sequence.
+    code_date: 'YYYY-MM-DD' format.
+    Example: '2026-08-12' with 6 existing Aug projects → 'WELL20260812007'
     """
     sb = _get_sb()
     from datetime import datetime as dt
     d = dt.strptime(code_date, "%Y-%m-%d")
     prefix = f"WELL{d.strftime('%Y%m%d')}"
-    result = sb.table("projects").select("id", count="exact").like("project_code", f"{prefix}%").execute()
+    # Count all projects in the same month (YYYYMM) for monthly sequence
+    month_prefix = f"WELL{d.strftime('%Y%m')}"
+    result = sb.table("projects").select("id", count="exact").like("project_code", f"{month_prefix}%").execute()
     seq = (result.count or 0) + 1
     return f"{prefix}{seq:03d}"
 

@@ -130,14 +130,9 @@ def _render_table(projects):
     # Cost item display order
     COST_ORDER = {'拍摄': 1, '餐饮交通': 2, '兼职执行': 3, '发布': 4, '补发': 5}
 
-    # Sticky column left offsets (estimated widths)
-    STICKY_STYLE = [
-        'position:sticky;left:0;background:#fff;z-index:2',        # 序号
-        'position:sticky;left:50px;background:#fff;z-index:2',     # 客户
-        'position:sticky;left:130px;background:#fff;z-index:2',    # 项目名称
-        'position:sticky;left:300px;background:#fff;z-index:2',    # 编号
-    ]
-    HEADER_STYLE = 'position:sticky;top:0;background:#f5f5f5;z-index:3'
+    # Column widths for sticky positioning
+    COL_W = [50, 80, 180, 160]  # 序号, 客户, 项目名称, 编号
+    CUM_W = [0, 50, 130, 310]   # cumulative left offsets
 
     rows_html = ""
     for p in projects:
@@ -161,13 +156,12 @@ def _render_table(projects):
         try: cost_items = json.loads(p.get('cost_breakdown','') or '[]')
         except: cost_items = []
 
-        # Sort cost items by defined order
         if cost_items:
             cost_items.sort(key=lambda x: COST_ORDER.get(x.get('name',''), 99))
 
-        # Payment action hint for table column
+        # Payment action indicator
         if p.get('status') == 'approved' and not p.get('payment_received'):
-            pay_hint = '🔲 待操作'
+            pay_hint = '💰'
         else:
             pay_hint = ''
 
@@ -176,57 +170,83 @@ def _render_table(projects):
             for idx, item in enumerate(cost_items):
                 rows_html += "<tr>"
                 if idx == 0:
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle;{STICKY_STYLE[0]}'>{p.get('id','')}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle;{STICKY_STYLE[1]}'>{p.get('client_short','')}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle;{STICKY_STYLE[2]};max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>{(p.get('project_name','') or '')[:35]}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle;{STICKY_STYLE[3]}'>{code}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{exec_period}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{exp_pay}</td>"
+                    rows_html += f"<td class='sticky-col' style='left:{CUM_W[0]}px;width:{COL_W[0]}px' rowspan='{n}'>{p.get('id','')}</td>"
+                    rows_html += f"<td class='sticky-col' style='left:{CUM_W[1]}px;width:{COL_W[1]}px' rowspan='{n}'>{p.get('client_short','')}</td>"
+                    rows_html += f"<td class='sticky-col' style='left:{CUM_W[2]}px;width:{COL_W[2]}px;white-space:nowrap' rowspan='{n}'>{(p.get('project_name','') or '')[:35]}</td>"
+                    rows_html += f"<td class='sticky-col' style='left:{CUM_W[3]}px;width:{COL_W[3]}px' rowspan='{n}'>{code}</td>"
+                    rows_html += f"<td rowspan='{n}'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
+                    rows_html += f"<td rowspan='{n}'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
+                    rows_html += f"<td rowspan='{n}'>{exec_period}</td>"
+                    rows_html += f"<td rowspan='{n}'>{exp_pay}</td>"
                 rows_html += f"<td>{item.get('name','')}</td>"
                 rows_html += f"<td style='text-align:right'>{item.get('amount',0):,.0f}</td>"
                 if idx == 0:
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{total_cost:,.0f}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{feishu}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{paid}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle;font-size:12px'>{pay_hint}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{closure}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{stage}</td>"
+                    rows_html += f"<td rowspan='{n}'>{total_cost:,.0f}</td>"
+                    rows_html += f"<td rowspan='{n}'>{feishu}</td>"
+                    rows_html += f"<td rowspan='{n}'>{paid}</td>"
+                    rows_html += f"<td rowspan='{n}' style='font-size:18px'>{pay_hint}</td>"
+                    rows_html += f"<td rowspan='{n}'>{closure}</td>"
+                    rows_html += f"<td rowspan='{n}'>{stage}</td>"
                 rows_html += "</tr>"
         else:
             rows_html += "<tr>"
-            rows_html += f"<td style='text-align:center;{STICKY_STYLE[0]}'>{p.get('id','')}</td>"
-            rows_html += f"<td style='text-align:center;{STICKY_STYLE[1]}'>{p.get('client_short','')}</td>"
-            rows_html += f"<td style='text-align:center;{STICKY_STYLE[2]};max-width:180px;overflow:hidden'>{p.get('project_name','') or ''}</td>"
-            rows_html += f"<td style='text-align:center;{STICKY_STYLE[3]}'>{code}</td>"
-            rows_html += f"<td style='text-align:center'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
-            rows_html += f"<td style='text-align:center'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
-            rows_html += f"<td style='text-align:center'>{exec_period}</td>"
-            rows_html += f"<td style='text-align:center'>{exp_pay}</td>"
+            rows_html += f"<td class='sticky-col' style='left:{CUM_W[0]}px;width:{COL_W[0]}px'>{p.get('id','')}</td>"
+            rows_html += f"<td class='sticky-col' style='left:{CUM_W[1]}px;width:{COL_W[1]}px'>{p.get('client_short','')}</td>"
+            rows_html += f"<td class='sticky-col' style='left:{CUM_W[2]}px;width:{COL_W[2]}px;white-space:nowrap'>{(p.get('project_name','') or '')[:35]}</td>"
+            rows_html += f"<td class='sticky-col' style='left:{CUM_W[3]}px;width:{COL_W[3]}px'>{code}</td>"
+            rows_html += f"<td>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
+            rows_html += f"<td>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
+            rows_html += f"<td>{exec_period}</td>"
+            rows_html += f"<td>{exp_pay}</td>"
             rows_html += f"<td></td><td style='text-align:right'>{total_cost:,.0f}</td>"
-            rows_html += f"<td style='text-align:center'>{total_cost:,.0f}</td>"
-            rows_html += f"<td style='text-align:center'>{feishu}</td>"
-            rows_html += f"<td style='text-align:center'>{paid}</td>"
-            rows_html += f"<td style='text-align:center;font-size:12px'>{pay_hint}</td>"
-            rows_html += f"<td style='text-align:center'>{closure}</td>"
-            rows_html += f"<td style='text-align:center'>{stage}</td>"
+            rows_html += f"<td>{total_cost:,.0f}</td>"
+            rows_html += f"<td>{feishu}</td>"
+            rows_html += f"<td>{paid}</td>"
+            rows_html += f"<td style='font-size:18px'>{pay_hint}</td>"
+            rows_html += f"<td>{closure}</td>"
+            rows_html += f"<td>{stage}</td>"
             rows_html += "</tr>"
 
     header_cells = ""
     headers = ['序号','客户','项目名称','编号','确认函金额','Invoice金额','执行周期','预计付款','成本细项','成本金额','总成本','立项','到账','操作','结案','阶段']
     for i, h in enumerate(headers):
-        extra = f"style='{HEADER_STYLE};{STICKY_STYLE[min(i,3)]}'" if i < 4 else f"style='{HEADER_STYLE}'"
-        header_cells += f"<th {extra}>{h}</th>"
+        if i < 4:
+            header_cells += f"<th class='sticky-col sticky-header' style='left:{CUM_W[i]}px;width:{COL_W[i]}px'>{h}</th>"
+        else:
+            header_cells += f"<th class='sticky-header'>{h}</th>"
 
     html = f"""
     <style>
-    .table-wrap {{ overflow-x: auto; max-width: 100%; border: 1px solid #ddd; }}
-    .table-wrap table {{ border-collapse: collapse; width: max-content; min-width: 1200px; font-size: 14px; font-family: -apple-system, sans-serif; }}
-    .table-wrap th, .table-wrap td {{ border: 1px solid #ddd; padding: 8px 8px; font-size: 14px; white-space: nowrap; }}
-    .table-wrap th {{ background: #f5f5f5; text-align: center; font-size: 14px; }}
-    .table-wrap tr:nth-child(even) td {{ background: #fafafa; }}
-    .table-wrap tr:nth-child(even) td[style*="sticky"] {{ background: #fafafa; }}
+    .table-wrap {{
+        overflow-x: auto; max-width: 100%; border: 1px solid #ddd;
+        -webkit-overflow-scrolling: touch;
+    }}
+    .table-wrap table {{
+        border-collapse: collapse; width: max-content; min-width: 1500px;
+        font-size: 14px; font-family: -apple-system, sans-serif;
+    }}
+    .table-wrap th, .table-wrap td {{
+        border: 1px solid #ddd; padding: 6px 8px; font-size: 14px;
+        text-align: center; vertical-align: middle;
+    }}
+    .table-wrap .sticky-header {{
+        background: #f0f0f0; position: sticky; top: 0; z-index: 3;
+    }}
+    .table-wrap .sticky-col {{
+        position: sticky; z-index: 2; background: #fff;
+    }}
+    .table-wrap .sticky-col.sticky-header {{
+        z-index: 4; background: #e8e8e8;
+    }}
+    .table-wrap tr:nth-child(even) .sticky-col {{
+        background: #fafafa;
+    }}
+    .table-wrap td {{
+        background: #fff;
+    }}
+    .table-wrap tr:nth-child(even) td {{
+        background: #fafafa;
+    }}
     </style>
     <div class="table-wrap">
     <table>
@@ -237,33 +257,34 @@ def _render_table(projects):
     """
     st.markdown(html, unsafe_allow_html=True)
 
-    # Payment actions — below the table, per project
+    # Payment actions — compact inline rows below the table
     not_full = [p for p in projects if p.get('status')=='approved' and not p.get('payment_received')]
     if not_full:
         st.divider()
-        st.caption("💰 到账操作（对应上表「🔲 待操作」项目）")
         for p in not_full[:20]:
             pid_key = f"paid_amt_{p['id']}"
             total_amt = p.get('amount', 0)
             already_rcvd = p.get('received_amount', 0) or 0
             remaining = total_amt - already_rcvd
 
-            c1, c2, c3, c4 = st.columns([3, 1.5, 1.5, 1.5])
+            c1, c2, c3, c4, c5 = st.columns([2.5, 1, 1, 0.8, 1])
             with c1:
-                pct = f"（已到 {already_rcvd:,.0f} / {total_amt:,.0f}）" if already_rcvd > 0 else ""
-                st.write(f"**{p.get('brand_name','')}** {pct}")
-                code_show = p.get('project_code','') or '（待分配）'
-                st.caption(f"{code_show} | {p.get('currency','USD')} {total_amt:,.0f}")
+                code_show = p.get('project_code','') or '待分配'
+                pct = f"（已到 {already_rcvd:,.0f}/{total_amt:,.0f}）" if already_rcvd > 0 else ""
+                st.write(f"💰 **{p.get('brand_name','')}** {pct}")
+                st.caption(f"{code_show}")
             with c2:
                 amt = st.number_input("本次到账", min_value=0.0, max_value=float(remaining),
                                      value=float(remaining), step=100.0,
-                                     key=f"{pid_key}_input",
+                                     key=f"{pid_key}_in",
                                      label_visibility="collapsed")
             with c3:
                 cur = st.selectbox("币种", ["USD", "RMB"],
                                   index=0 if p.get('currency','USD')=='USD' else 1,
-                                  key=f"{pid_key}_cur", label_visibility="collapsed")
+                                  key=f"{pid_key}_cu", label_visibility="collapsed")
             with c4:
+                st.write("")  # spacer
+            with c5:
                 if st.button("✅ 确认到账", key=f"paid_{pid_key}", use_container_width=True):
                     new_total = already_rcvd + amt
                     from utils.database import get_connection

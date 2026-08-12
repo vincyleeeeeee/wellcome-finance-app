@@ -57,7 +57,8 @@ def page_workspace():
     # === Rejected warnings ===
     rejected_mine = [p for p in projects if p.get('status') == 'rejected' and p.get('created_by') == user['id']]
     for rp in rejected_mine:
-        st.warning(f"⚠️ {rp.get('brand_name','')} ({rp.get('project_code','')}) 已被驳回")
+        reason = rp.get('rejection_reason','') or '未填写原因'
+        st.warning(f"⚠️ {rp.get('brand_name','')} 已被驳回 —— {reason}")
         if st.button("📤 修改重提", key=f"resub_{rp['id']}"):
             st.session_state['edit_project_id'] = rp['id']
             st.session_state.page = "generate"; st.rerun()
