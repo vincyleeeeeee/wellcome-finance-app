@@ -127,15 +127,26 @@ def page_overview():
 
 
 def _render_table(projects):
+    # Cost item display order
+    COST_ORDER = {'拍摄': 1, '餐饮交通': 2, '兼职执行': 3, '发布': 4, '补发': 5}
+
+    # Sticky column left offsets (estimated widths)
+    STICKY_STYLE = [
+        'position:sticky;left:0;background:#fff;z-index:2',        # 序号
+        'position:sticky;left:50px;background:#fff;z-index:2',     # 客户
+        'position:sticky;left:130px;background:#fff;z-index:2',    # 项目名称
+        'position:sticky;left:300px;background:#fff;z-index:2',    # 编号
+    ]
+    HEADER_STYLE = 'position:sticky;top:0;background:#f5f5f5;z-index:3'
+
     rows_html = ""
     for p in projects:
         stage = STAGE_MAP.get(p.get('status', ''), p.get('status', '?'))
         closure = CLOSURE_MAP.get(p.get('closure_status', 'active'), '')
         rcvd = p.get('received_amount', 0) or 0
+        total_amt = p.get('amount', 1) or 1
         if p.get('payment_received'): paid = '✅ 全款'
-        elif rcvd > 0:
-            total = p.get('amount', 1) or 1
-            paid = f'💵 {rcvd/total*100:.0f}%'
+        elif rcvd > 0: paid = f'💵 {rcvd/total_amt*100:.0f}%'
         else: paid = ''
         feishu = '是' if p.get('feishu_approved') else '否'
         total_cost = p.get('estimated_cost',0) or 0
@@ -145,23 +156,30 @@ def _render_table(projects):
             if hasattr(epd, 'strftime'): exp_pay = epd.strftime('%Y/%-m/%-d').replace('/0','/')
             else: exp_pay = str(epd)[:10].replace('-','/')
         else: exp_pay = ''
-        code = p.get('project_code','')
-        if len(code) >= 15: year_month = f"{code[4:8]}-{code[8:10]}"
-        elif len(code) >= 8: year_month = f"{code[4:8]}-{code[8:10]}"
-        else: year_month = ''
+        code = p.get('project_code','') or '待分配'
 
         try: cost_items = json.loads(p.get('cost_breakdown','') or '[]')
         except: cost_items = []
+
+        # Sort cost items by defined order
+        if cost_items:
+            cost_items.sort(key=lambda x: COST_ORDER.get(x.get('name',''), 99))
+
+        # Payment action hint for table column
+        if p.get('status') == 'approved' and not p.get('payment_received'):
+            pay_hint = '🔲 待操作'
+        else:
+            pay_hint = ''
 
         if cost_items:
             n = len(cost_items)
             for idx, item in enumerate(cost_items):
                 rows_html += "<tr>"
                 if idx == 0:
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('id','')}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('client_short','')}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{(p.get('project_name','') or '')[:35]}</td>"
-                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{code}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle;{STICKY_STYLE[0]}'>{p.get('id','')}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle;{STICKY_STYLE[1]}'>{p.get('client_short','')}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle;{STICKY_STYLE[2]};max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>{(p.get('project_name','') or '')[:35]}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle;{STICKY_STYLE[3]}'>{code}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{exec_period}</td>"
@@ -172,15 +190,16 @@ def _render_table(projects):
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{total_cost:,.0f}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{feishu}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{paid}</td>"
+                    rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle;font-size:12px'>{pay_hint}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{closure}</td>"
                     rows_html += f"<td rowspan='{n}' style='text-align:center;vertical-align:middle'>{stage}</td>"
                 rows_html += "</tr>"
         else:
             rows_html += "<tr>"
-            rows_html += f"<td style='text-align:center'>{p.get('id','')}</td>"
-            rows_html += f"<td style='text-align:center'>{p.get('client_short','')}</td>"
-            rows_html += f"<td style='text-align:center'>{(p.get('project_name','') or '')[:35]}</td>"
-            rows_html += f"<td style='text-align:center'>{code}</td>"
+            rows_html += f"<td style='text-align:center;{STICKY_STYLE[0]}'>{p.get('id','')}</td>"
+            rows_html += f"<td style='text-align:center;{STICKY_STYLE[1]}'>{p.get('client_short','')}</td>"
+            rows_html += f"<td style='text-align:center;{STICKY_STYLE[2]};max-width:180px;overflow:hidden'>{p.get('project_name','') or ''}</td>"
+            rows_html += f"<td style='text-align:center;{STICKY_STYLE[3]}'>{code}</td>"
             rows_html += f"<td style='text-align:center'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
             rows_html += f"<td style='text-align:center'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
             rows_html += f"<td style='text-align:center'>{exec_period}</td>"
@@ -189,69 +208,75 @@ def _render_table(projects):
             rows_html += f"<td style='text-align:center'>{total_cost:,.0f}</td>"
             rows_html += f"<td style='text-align:center'>{feishu}</td>"
             rows_html += f"<td style='text-align:center'>{paid}</td>"
+            rows_html += f"<td style='text-align:center;font-size:12px'>{pay_hint}</td>"
             rows_html += f"<td style='text-align:center'>{closure}</td>"
             rows_html += f"<td style='text-align:center'>{stage}</td>"
             rows_html += "</tr>"
 
+    header_cells = ""
+    headers = ['序号','客户','项目名称','编号','确认函金额','Invoice金额','执行周期','预计付款','成本细项','成本金额','总成本','立项','到账','操作','结案','阶段']
+    for i, h in enumerate(headers):
+        extra = f"style='{HEADER_STYLE};{STICKY_STYLE[min(i,3)]}'" if i < 4 else f"style='{HEADER_STYLE}'"
+        header_cells += f"<th {extra}>{h}</th>"
+
     html = f"""
     <style>
-    table {{ border-collapse: collapse; width: 100%; font-size: 14px; font-family: -apple-system, sans-serif; }}
-    th, td {{ border: 1px solid #ddd; padding: 8px 8px; font-size: 14px; }}
-    th {{ background: #f5f5f5; text-align: center; font-size: 14px; }}
-    tr:nth-child(even) {{ background: #fafafa; }}
+    .table-wrap {{ overflow-x: auto; max-width: 100%; border: 1px solid #ddd; }}
+    .table-wrap table {{ border-collapse: collapse; width: max-content; min-width: 1200px; font-size: 14px; font-family: -apple-system, sans-serif; }}
+    .table-wrap th, .table-wrap td {{ border: 1px solid #ddd; padding: 8px 8px; font-size: 14px; white-space: nowrap; }}
+    .table-wrap th {{ background: #f5f5f5; text-align: center; font-size: 14px; }}
+    .table-wrap tr:nth-child(even) td {{ background: #fafafa; }}
+    .table-wrap tr:nth-child(even) td[style*="sticky"] {{ background: #fafafa; }}
     </style>
+    <div class="table-wrap">
     <table>
-    <tr><th>序号</th><th>客户</th><th>项目名称</th><th>编号</th><th>确认函金额</th>
-    <th>Invoice金额</th><th>执行周期</th><th>预计付款</th><th>成本细项</th><th>成本金额</th>
-    <th>总成本</th><th>立项</th><th>到账</th><th>结案</th><th>阶段</th></tr>
+    <tr>{header_cells}</tr>
     {rows_html}
     </table>
+    </div>
     """
     st.markdown(html, unsafe_allow_html=True)
 
-
-    # Quick action: mark payment for approved projects (including partial)
-    st.divider()
+    # Payment actions — below the table, per project
     not_full = [p for p in projects if p.get('status')=='approved' and not p.get('payment_received')]
     if not_full:
-        st.subheader("💰 到账操作")
+        st.divider()
+        st.caption("💰 到账操作（对应上表「🔲 待操作」项目）")
         for p in not_full[:20]:
             pid_key = f"paid_amt_{p['id']}"
             total_amt = p.get('amount', 0)
             already_rcvd = p.get('received_amount', 0) or 0
             remaining = total_amt - already_rcvd
 
-            with st.container(border=True):
-                c1, c2, c3, c4 = st.columns([3, 1.5, 1.5, 1.5])
-                with c1:
-                    pct = f"（已到 {already_rcvd:,.0f} / {total_amt:,.0f}）" if already_rcvd > 0 else ""
-                    st.write(f"**{p.get('brand_name','')}** {pct}")
-                    code_show = p.get('project_code','') or '（待分配）'
-                    st.caption(f"{code_show} | {p.get('currency','USD')} {total_amt:,.0f}")
-                with c2:
-                    amt = st.number_input("本次到账", min_value=0.0, max_value=float(remaining),
-                                         value=float(remaining), step=100.0,
-                                         key=f"{pid_key}_input",
-                                         label_visibility="collapsed")
-                with c3:
-                    cur = st.selectbox("币种", ["USD", "RMB"],
-                                      index=0 if p.get('currency','USD')=='USD' else 1,
-                                      key=f"{pid_key}_cur", label_visibility="collapsed")
-                with c4:
-                    if st.button("✅ 确认到账", key=f"paid_{pid_key}", use_container_width=True):
-                        new_total = already_rcvd + amt
-                        from utils.database import get_connection
-                        get_connection().table("projects").update({
-                            "received_amount": new_total,
-                            "payment_received": new_total >= total_amt,
-                            "received_date": datetime.now().strftime('%Y-%m-%d'),
-                        }).eq("id", p['id']).execute()
-                        # Store receipt info and jump to receipt page
-                        st.session_state['receipt_project_id'] = p['id']
-                        st.session_state['receipt_amount'] = amt
-                        st.session_state['receipt_currency'] = cur
-                        st.session_state.page = "receipt"
-                        st.rerun()
+            c1, c2, c3, c4 = st.columns([3, 1.5, 1.5, 1.5])
+            with c1:
+                pct = f"（已到 {already_rcvd:,.0f} / {total_amt:,.0f}）" if already_rcvd > 0 else ""
+                st.write(f"**{p.get('brand_name','')}** {pct}")
+                code_show = p.get('project_code','') or '（待分配）'
+                st.caption(f"{code_show} | {p.get('currency','USD')} {total_amt:,.0f}")
+            with c2:
+                amt = st.number_input("本次到账", min_value=0.0, max_value=float(remaining),
+                                     value=float(remaining), step=100.0,
+                                     key=f"{pid_key}_input",
+                                     label_visibility="collapsed")
+            with c3:
+                cur = st.selectbox("币种", ["USD", "RMB"],
+                                  index=0 if p.get('currency','USD')=='USD' else 1,
+                                  key=f"{pid_key}_cur", label_visibility="collapsed")
+            with c4:
+                if st.button("✅ 确认到账", key=f"paid_{pid_key}", use_container_width=True):
+                    new_total = already_rcvd + amt
+                    from utils.database import get_connection
+                    get_connection().table("projects").update({
+                        "received_amount": new_total,
+                        "payment_received": new_total >= total_amt,
+                        "received_date": datetime.now().strftime('%Y-%m-%d'),
+                    }).eq("id", p['id']).execute()
+                    st.session_state['receipt_project_id'] = p['id']
+                    st.session_state['receipt_amount'] = amt
+                    st.session_state['receipt_currency'] = cur
+                    st.session_state.page = "receipt"
+                    st.rerun()
 
 
 def _export_excel(projects):
@@ -380,8 +405,14 @@ def page_approval():
                                 _gen_stamped_only(p, st.session_state['just_approved']['path'])
                                 st.rerun()
                             except Exception as e: st.error(f"失败: {e}")
+                    reject_reason = st.text_input("驳回原因", key=f"rej_reason_{p['id']}",
+                                                  placeholder="请填写驳回原因")
                     if st.button("❌ 驳回", key=f"no_{p['id']}", use_container_width=True):
-                        reject_project(p['id'], user['id']); st.warning("已驳回"); st.rerun()
+                        if not reject_reason.strip():
+                            st.error("请填写驳回原因")
+                        else:
+                            reject_project(p['id'], user['id'], reject_reason.strip())
+                            st.warning("已驳回"); st.rerun()
     else:
         st.success("✅ 没有需要审核的项目")
 
@@ -402,6 +433,24 @@ def page_approval():
                 st.text_area("正文", value=ja.get('email_body',''), height=180, key="ja_body")
         if st.button("✅ 已处理"):
             st.session_state['just_approved'] = None; st.rerun()
+
+    # Rejected projects
+    all_p2 = get_projects(limit=200)
+    rejected_list = [p for p in all_p2 if p.get('status')=='rejected']
+    if rejected_list:
+        st.divider()
+        st.subheader(f"❌ 已驳回项目（{len(rejected_list)}个）")
+        for p in rejected_list:
+            with st.container(border=True):
+                c1, c2 = st.columns([4, 1])
+                with c1:
+                    reason = p.get('rejection_reason','') or '（未填写原因）'
+                    st.write(f"**{p.get('brand_name','')}** — {p.get('project_code','') or '待分配'}")
+                    st.caption(f"驳回原因：{reason}  |  {p.get('client_short','')}  |  {(p.get('created_at','') or '')[:10]}")
+                with c2:
+                    if st.button("📝 重新编辑", key=f"reedit_{p['id']}", use_container_width=True):
+                        st.session_state['edit_project_id'] = p['id']
+                        st.session_state.page = "generate"; st.rerun()
 
     # Approved projects with download
     st.divider()

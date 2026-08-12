@@ -253,6 +253,23 @@ def page_login():
                 st.session_state.page = "workspace"
                 st.rerun()
 
+        # Forgot password
+        with st.expander("🔑 忘记密码？"):
+            reset_email = st.text_input("注册邮箱", key="reset_email", placeholder="输入你注册时用的邮箱")
+            reset_new_pw = st.text_input("新密码", type="password", key="reset_new_pw", placeholder="至少6位")
+            if st.button("重置密码", key="reset_pw_btn", use_container_width=True):
+                if not reset_email or not reset_new_pw:
+                    st.error("请填写邮箱和新密码")
+                elif len(reset_new_pw) < 6:
+                    st.error("密码至少6位")
+                else:
+                    from utils.database import reset_password
+                    ok, msg = reset_password(reset_email.strip(), reset_new_pw)
+                    if ok:
+                        st.success(msg)
+                    else:
+                        st.error(msg)
+
     with tab_register:
         st.subheader("注册")
         st.info("注册后需等待管理员审核通过才能使用")

@@ -259,14 +259,32 @@ def approve_project(project_id: int, finance_user_id: int, pdf_path: str) -> boo
     return True
 
 
-def reject_project(project_id: int, finance_user_id: int) -> bool:
+def reject_project(project_id: int, finance_user_id: int, reason: str = "") -> bool:
     sb = _get_sb()
-    sb.table("projects").update({
+    data = {
         "status": "rejected",
         "approved_by": finance_user_id,
         "approved_at": datetime.now().isoformat(),
-    }).eq("id", project_id).execute()
+    }
+    if reason:
+        data["rejection_reason"] = reason
+    sb.table("projects").update(data).eq("id", project_id).execute()
     return True
+
+
+def reset_password(email: str, new_password: str) -> Tuple[bool, str]:
+    """Reset password for a user by email."""
+    sb = _get_sb()
+    try:
+        result = sb.table("users").select("id").eq("email", email).execute()
+        if not result.data:
+            return False, "该邮箱未注册"
+        sb.table("users").update({
+            "password_hash": _hash_password(new_password)
+        }).eq("email", email).execute()
+        return True, "密码已重置，请重新登录"
+    except Exception as e:
+        return False, f"重置失败：{e}"
 
 
 def get_pending_approvals() -> List[Dict]:

@@ -231,15 +231,15 @@ def _show_info(edit_data, client_names, cmap, user):
     try:
         existing_costs = json.loads(edit_data.get('cost_breakdown','') or '[]')
         cost_map = {i['name']: i for i in existing_costs}
-        for cat in ["拍摄","餐饮交通","发布","补发"]:
+        for cat in ["拍摄","餐饮交通","兼职执行","发布","补发"]:
             if cat in cost_map and f"ei_cb_{cat}" not in st.session_state:
                 st.session_state[f"ei_cb_{cat}"] = True
                 st.session_state[f"ei_a_{cat}"] = float(cost_map[cat].get('amount',0))
                 st.session_state[f"ei_c_{cat}"] = cost_map[cat].get('currency','RMB')
     except: pass
 
-    ccols = st.columns(4)
-    for i, cat in enumerate(["拍摄","餐饮交通","发布","补发"]):
+    ccols = st.columns(5)
+    for i, cat in enumerate(["拍摄","餐饮交通","兼职执行","发布","补发"]):
         with ccols[i]:
             if st.checkbox(cat, value=st.session_state.get(f"ei_cb_{cat}", False), key=f"ei_cb_{cat}"):
                 a = st.number_input("金额", key=f"ei_a_{cat}", step=100.0)
