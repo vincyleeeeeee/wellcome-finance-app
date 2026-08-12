@@ -77,6 +77,9 @@ def _quick_create(client_names, cmap, user):
             sel = st.selectbox("客户简称", client_names, key="qc_sel")
             st.text_input("项目编号（开发票时自动分配）", value="", key="qc_code",
                           placeholder="留空，开发票时自动生成")
+            from utils.database import generate_project_code
+            ref_code = generate_project_code(datetime.now().strftime('%Y-%m-%d'))
+            st.caption(f"📝 今天开发票的话，下一个可用：**{ref_code}**")
             st.text_input("项目名称 *", key="qc_name",
                           placeholder="laclef_202606_公寓测评_小红书KOL_4")
             st.caption("格式：品牌_年月_产品类型_小红书UGC/小红书KOL_数量")
@@ -155,10 +158,15 @@ def _show_info(edit_data, client_names, cmap, user):
         dow = unames.index(owner_name) if owner_name in unames else 0
         st.selectbox("负责人", unames, index=dow, key="ei_owner")
 
-        # Project code — no longer auto-generated at creation; assigned at invoice time
+        # Project code — show next available for reference, assigned at invoice time
         existing_code = edit_data.get('project_code','')
         st.text_input("项目编号", value=existing_code, key="ei_code",
                       placeholder="留空，开发票时按当天日期自动分配")
+        # Show next available code for reference
+        if not existing_code:
+            from utils.database import generate_project_code
+            today_code = generate_project_code(datetime.now().strftime('%Y-%m-%d'))
+            st.caption(f"📝 今天开发票的话，下一个可用编号：**{today_code}**（仅供参考，审核时自动分配）")
         st.text_input("项目名称", value=edit_data.get('project_name',''), key="ei_name",
                       placeholder="laclef_202606_公寓测评_小红书KOL_4")
         st.caption("格式：品牌_年月_产品类型_小红书UGC/小红书KOL_数量")

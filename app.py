@@ -479,6 +479,8 @@ def _page_generate_placeholder():
             project_code = st.text_input("项目编号", value="",
                                         placeholder="留空，开发票时按当天日期自动分配",
                                         help="可不填，审核通过开发票时会自动生成")
+            today_code = generate_project_code(datetime.now().strftime('%Y-%m-%d'))
+            st.caption(f"📝 今天开发票的话，下一个可用编号：**{today_code}**（仅供参考）")
         project_name = st.text_input("项目名称 *", value=edit_data.get('project_name','') if edit_data else '',
                                      placeholder="品牌名 – 月份UGC 篇数")
         brand_name = st.text_input("客户品牌名 *", value=edit_data.get('brand_name','') if edit_data else '',
