@@ -173,9 +173,10 @@ def _render_table(projects):
             '待收': remaining,
             '本次到账': 0.0,
             '到账状态': paid,
+            '到账时间': _fmt_date_val(p.get('received_date')) or '',
         }
         for cc in cost_cols:
-            row[cc] = cost_map.get(cc)
+            row[cc] = cost_map.get(cc) or 0
         row['总成本'] = p.get('estimated_cost', 0) or 0
         row['立项'] = '是' if p.get('feishu_approved') else '否'
         row['结案'] = CLOSURE_MAP.get(p.get('closure_status', 'active') or 'active', '')
@@ -197,6 +198,7 @@ def _render_table(projects):
         '待收': st.column_config.NumberColumn('🟢 待收', format='%.0f', width='small'),
         '本次到账': st.column_config.NumberColumn('🟢 本次到账', format='%.0f', min_value=0.0, width='small'),
         '到账状态': st.column_config.TextColumn('🟢 到账状态', width='small'),
+        '到账时间': st.column_config.TextColumn('🟢 到账时间', width='small'),
         '总成本': st.column_config.NumberColumn('🟠 总成本', format='%.0f', width='small'),
         '立项': st.column_config.TextColumn('立项', width='small'),
         '结案': st.column_config.TextColumn('结案', width='small'),
@@ -273,7 +275,7 @@ def _export_excel(projects):
     import openpyxl as xl
     from openpyxl.styles import Font, Alignment, Border, Side
     wb = xl.Workbook(); ws = wb.active; ws.title = "成本明细"
-    hs = ['序号','客户','项目名称','编号','金额','执行周期','预计付款','成本细项','成本金额','总成本','立项','到账','结案','阶段']
+    hs = ['序号','客户','项目名称','编号','金额','执行周期','预计付款','成本细项','成本金额','总成本','立项','是否到账','到账金额','到账时间','结案','阶段']
     thin = Side(style='thin')
     for c,h in enumerate(hs,1):
         cell=ws.cell(1,c,h); cell.font=Font(bold=True); cell.alignment=Alignment(horizontal='center',vertical='center')
@@ -284,8 +286,9 @@ def _export_excel(projects):
         closure=CLOSURE_MAP.get(p.get('closure_status',''),'')
         rcvd_amt = p.get('received_amount', 0) or 0
         if p.get('payment_received'): paid = '是'
-        elif rcvd_amt > 0: paid = f'{rcvd_amt/p.get("amount", 1)*100:.0f}%'
+        elif rcvd_amt > 0: paid = '部分'
         else: paid = '否'
+        rcv_date = _fmt_date_val(p.get('received_date')) or ''
         try: items=json.loads(p.get('cost_breakdown','') or '[]')
         except: items=[]
         if items:
@@ -297,7 +300,7 @@ def _export_excel(projects):
         exp_p = str(p.get('expected_payment_date','') or '')[:10]
         if items:
             for it in items:
-                ws.cell(row,8,it.get('name','')); ws.cell(row,9,it.get('amount',0))
+                ws.cell(row,8,it.get('name','')); ws.cell(row,9,(it.get('amount') or 0))
                 row+=1
         else:
             ws.cell(row,9,total_cost)
@@ -315,21 +318,23 @@ def _export_excel(projects):
         ws.cell(start_row,10,total_cost)
         ws.cell(start_row,11,feishu)
         ws.cell(start_row,12,paid)
-        ws.cell(start_row,13,closure)
-        ws.cell(start_row,14,stage)
+        ws.cell(start_row,13,rcvd_amt)
+        ws.cell(start_row,14,rcv_date)
+        ws.cell(start_row,15,closure)
+        ws.cell(start_row,16,stage)
 
         # Center
-        for c in range(1,15):
+        for c in range(1,17):
             ws.cell(start_row,c).alignment=Alignment(horizontal='center',vertical='center')
 
         # Merge cells for multi-row projects
         if end_row > start_row:
-            for c in [1,2,3,4,5,6,7,10,11,12,13,14]:
+            for c in [1,2,3,4,5,6,7,10,11,12,13,14,15,16]:
                 ws.merge_cells(start_row=start_row, start_column=c, end_row=end_row, end_column=c)
 
         # Borders
         for r in range(start_row, end_row+1):
-            for c in range(1,11):
+            for c in range(1,17):
                 ws.cell(r,c).border=Border(bottom=Side(style='hair'))
 
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
