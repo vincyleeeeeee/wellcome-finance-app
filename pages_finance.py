@@ -130,9 +130,23 @@ def page_overview():
 
 
 def _render_table(projects):
-    # 成本明细合在一列、按项换行竖排（每个成本项一行）
+    # 成本明细横向铺成列：每个成本项一列，成本项多自动多列（配合左右滑动）
+    cost_cols = []
+    seen = set()
+    all_items = []
+    for p in projects:
+        try:
+            items = json.loads(p.get('cost_breakdown', '') or '[]')
+        except Exception:
+            items = []
+        all_items.extend(items)
+    for it in sorted(all_items, key=lambda x: COST_ORDER.get(x.get('name', ''), 99)):
+        nm = it.get('name', '')
+        if nm and nm not in seen:
+            seen.add(nm)
+            cost_cols.append(nm)
+
     rows = []
-    max_items = 1
     for seq_no, p in enumerate(projects, start=1):
         rcvd = p.get('received_amount', 0) or 0
         total = p.get('amount', 0) or 0
@@ -147,14 +161,9 @@ def _render_table(projects):
             items = json.loads(p.get('cost_breakdown', '') or '[]')
         except Exception:
             items = []
-        if items:
-            items = sorted(items, key=lambda x: COST_ORDER.get(x.get('name', ''), 99))
-            max_items = max(max_items, len(items))
-            cost_txt = '\n'.join(f"{it.get('name','')} {it.get('amount',0):,.0f}" for it in items)
-        else:
-            cost_txt = ''
+        cost_map = {it.get('name', ''): it.get('amount', 0) for it in items}
 
-        rows.append({
+        row = {
             '序号': seq_no,
             '客户': p.get('client_short', '') or '',
             '项目名称': (p.get('project_name', '') or '')[:35],
@@ -164,13 +173,15 @@ def _render_table(projects):
             '待收': remaining,
             '本次到账': 0.0,
             '到账状态': paid,
-            '成本明细': cost_txt,
-            '总成本': p.get('estimated_cost', 0) or 0,
-            '立项': '是' if p.get('feishu_approved') else '否',
-            '结案': CLOSURE_MAP.get(p.get('closure_status', 'active') or 'active', ''),
-            '阶段': STAGE_MAP.get(p.get('status', ''), p.get('status', '?')),
-            '__id': p.get('id'),
-        })
+        }
+        for cc in cost_cols:
+            row[cc] = cost_map.get(cc)
+        row['总成本'] = p.get('estimated_cost', 0) or 0
+        row['立项'] = '是' if p.get('feishu_approved') else '否'
+        row['结案'] = CLOSURE_MAP.get(p.get('closure_status', 'active') or 'active', '')
+        row['阶段'] = STAGE_MAP.get(p.get('status', ''), p.get('status', '?'))
+        row['__id'] = p.get('id')
+        rows.append(row)
 
     df = pd.DataFrame(rows)
     display_cols = [c for c in df.columns if c != '__id']
@@ -186,18 +197,16 @@ def _render_table(projects):
         '待收': st.column_config.NumberColumn('待收', format='%.0f', width='small'),
         '本次到账': st.column_config.NumberColumn('本次到账', format='%.0f', min_value=0.0, width='small'),
         '到账状态': st.column_config.TextColumn('到账状态', width='small'),
-        '成本明细': st.column_config.TextColumn('成本明细', width='medium'),
         '总成本': st.column_config.NumberColumn('总成本', format='%.0f', width='small'),
         '立项': st.column_config.TextColumn('立项', width='small'),
         '结案': st.column_config.TextColumn('结案', width='small'),
         '阶段': st.column_config.TextColumn('阶段', width='small'),
         '__id': None,
     }
+    for cc in cost_cols:
+        col_cfg[cc] = st.column_config.NumberColumn(cc, format='%.0f', width='small')
 
-    # 行高随成本项数量自适应，保证竖排全部显示（每项约 22px）
-    row_h = max(38, 22 * max_items + 10)
-
-    st.caption('💡 在「本次到账」列输入金额 → 点「保存到账」批量入账。成本明细按项竖排显示。')
+    st.caption('💡 在「本次到账」列输入金额 → 点「保存到账」批量入账。成本项多会自动多列，可左右滑动查看。')
     edited = st.data_editor(
         df,
         key='overview_editor',
@@ -206,8 +215,7 @@ def _render_table(projects):
         disabled=read_only,
         hide_index=True,
         use_container_width=True,
-        height=min(row_h * (len(df) + 1) + 3, 700),
-        row_height=row_h,
+        height=min(38 * (len(df) + 1) + 3, 600),
     )
 
     if st.button('💾 保存到账', type='primary', use_container_width=True):
