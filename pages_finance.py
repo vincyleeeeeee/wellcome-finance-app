@@ -208,7 +208,7 @@ def _render_table(projects):
     for cc in cost_cols:
         col_cfg[cc] = st.column_config.NumberColumn('🟠 ' + cc, format='%.0f', width='small')
 
-    st.caption('🟢 收入相关 ｜ 🟠 成本相关。在「🟢 本次到账」列输入金额，点下方「保存到账」。成本项多会自动多列，可左右滑动。')
+    st.markdown('<span style="font-size:18px;color:#333">🟢 收入相关 ｜ 🟠 成本相关。在「🟢 本次到账」列输入金额，点下方「保存到账」。成本项多会自动多列，可左右滑动。</span>', unsafe_allow_html=True)
 
     with st.form('overview_save_form'):
         edited = st.data_editor(
