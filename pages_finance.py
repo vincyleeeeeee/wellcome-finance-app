@@ -135,7 +135,7 @@ def _render_table(projects):
     CUM_W = [0, 50, 130, 310]   # cumulative left offsets
 
     rows_html = ""
-    for p in projects:
+    for seq_no, p in enumerate(projects, start=1):
         stage = STAGE_MAP.get(p.get('status', ''), p.get('status', '?'))
         closure = CLOSURE_MAP.get(p.get('closure_status', 'active'), '')
         rcvd = p.get('received_amount', 0) or 0
@@ -170,7 +170,7 @@ def _render_table(projects):
             for idx, item in enumerate(cost_items):
                 rows_html += "<tr>"
                 if idx == 0:
-                    rows_html += f"<td class='sticky-col' style='left:{CUM_W[0]}px;width:{COL_W[0]}px' rowspan='{n}'>{p.get('id','')}</td>"
+                    rows_html += f"<td class='sticky-col' style='left:{CUM_W[0]}px;width:{COL_W[0]}px' rowspan='{n}'>{seq_no}</td>"
                     rows_html += f"<td class='sticky-col' style='left:{CUM_W[1]}px;width:{COL_W[1]}px' rowspan='{n}'>{p.get('client_short','')}</td>"
                     rows_html += f"<td class='sticky-col' style='left:{CUM_W[2]}px;width:{COL_W[2]}px;white-space:nowrap' rowspan='{n}'>{(p.get('project_name','') or '')[:35]}</td>"
                     rows_html += f"<td class='sticky-col' style='left:{CUM_W[3]}px;width:{COL_W[3]}px' rowspan='{n}'>{code}</td>"
@@ -190,7 +190,7 @@ def _render_table(projects):
                 rows_html += "</tr>"
         else:
             rows_html += "<tr>"
-            rows_html += f"<td class='sticky-col' style='left:{CUM_W[0]}px;width:{COL_W[0]}px'>{p.get('id','')}</td>"
+            rows_html += f"<td class='sticky-col' style='left:{CUM_W[0]}px;width:{COL_W[0]}px'>{seq_no}</td>"
             rows_html += f"<td class='sticky-col' style='left:{CUM_W[1]}px;width:{COL_W[1]}px'>{p.get('client_short','')}</td>"
             rows_html += f"<td class='sticky-col' style='left:{CUM_W[2]}px;width:{COL_W[2]}px;white-space:nowrap'>{(p.get('project_name','') or '')[:35]}</td>"
             rows_html += f"<td class='sticky-col' style='left:{CUM_W[3]}px;width:{COL_W[3]}px'>{code}</td>"

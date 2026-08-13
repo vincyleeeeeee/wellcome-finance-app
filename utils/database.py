@@ -224,12 +224,19 @@ def get_projects(limit: int = 50, status: str = None) -> List[Dict]:
         if p.get("clients"):
             p["client_short"] = p["clients"]["short_name"] if isinstance(p["clients"], dict) else ""
             p["client_full"] = p["clients"]["full_name"] if isinstance(p["clients"], dict) else ""
-    # Sort: Zeeker always first, then by code desc, empty codes last
+    # Sort: 极氪置顶 → 月份新→旧 → 同月内编号(序号)小→大 → 空编号最后。
+    # 编号 WELL+YYYYMMDD+序号；极氪编号含 "ZK"（如 WELL202608ZK003）单独置顶。
     def _sort_key(p):
         code = p.get('project_code','') or ''
-        if 'ZK' in code: return (0, '')  # Zeeker on top
-        if not code: return (2, '')       # empty codes at bottom
-        return (1, code)                  # normal codes descending
+        if 'ZK' in code: return (0, 0, 0)   # 极氪置顶
+        if not code: return (2, 0, 0)       # 空编号最后
+        ym = code[4:10]                     # YYYYMM 月份
+        seq = code[12:]                     # 当月序号
+        try: m = int(ym)
+        except: m = 0
+        try: s = int(seq)
+        except: s = 0
+        return (1, -m, s)                   # 月份倒序、月内序号升序
     data.sort(key=_sort_key)
     return data
 
