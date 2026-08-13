@@ -321,16 +321,28 @@ def generate_project_code(code_date: str) -> str:
     """
     Generate next project code: WELL + YYYYMMDD + 3-digit monthly sequence.
     code_date: 'YYYY-MM-DD' format.
-    Example: '2026-08-12' with 6 existing Aug projects → 'WELL20260812007'
+    Example: '2026-08-13' with 5 existing Aug projects (001~005) → 'WELL20260813006'.
+    极氪项目（编号含 ZK，如 WELL202608ZK003）不占普通编号的号。
     """
     sb = _get_sb()
     from datetime import datetime as dt
     d = dt.strptime(code_date, "%Y-%m-%d")
     prefix = f"WELL{d.strftime('%Y%m%d')}"
-    # Count all projects in the same month (YYYYMM) for monthly sequence
+    # 当月所有项目，取普通编号（不含 ZK）的最大序号 + 1；极氪不占号
     month_prefix = f"WELL{d.strftime('%Y%m')}"
-    result = sb.table("projects").select("id", count="exact").like("project_code", f"{month_prefix}%").execute()
-    seq = (result.count or 0) + 1
+    result = sb.table("projects").select("project_code").like("project_code", f"{month_prefix}%").execute()
+    max_seq = 0
+    for row in (result.data or []):
+        code = row.get('project_code') or ''
+        if 'ZK' in code:
+            continue  # 极氪编号不占普通序号
+        try:
+            s = int(code[12:])
+            if s > max_seq:
+                max_seq = s
+        except (ValueError, IndexError):
+            pass
+    seq = max_seq + 1
     return f"{prefix}{seq:03d}"
 
 
