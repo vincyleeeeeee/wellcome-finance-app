@@ -127,10 +127,8 @@ def page_overview():
 
 
 def _render_table(projects):
-    # 成本细项展示顺序
-    COST_ORDER = {'拍摄': 1, '餐饮交通': 2, '兼职执行': 3, '发布': 4, '补发': 5}
-
-    rows = []
+    # ============ ① 行内到账操作（每项目一行，可编辑） ============
+    rows_pay = []
     for seq_no, p in enumerate(projects, start=1):
         rcvd = p.get('received_amount', 0) or 0
         total = p.get('amount', 0) or 0
@@ -141,16 +139,7 @@ def _render_table(projects):
             paid = f'💵 {rcvd/total*100:.0f}%' if total else ''
         else:
             paid = ''
-        try:
-            items = json.loads(p.get('cost_breakdown', '') or '[]')
-        except Exception:
-            items = []
-        if items:
-            items = sorted(items, key=lambda x: COST_ORDER.get(x.get('name', ''), 99))
-            cost_txt = ' / '.join(f"{it.get('name','')}{it.get('amount',0):,.0f}" for it in items)
-        else:
-            cost_txt = ''
-        rows.append({
+        rows_pay.append({
             '序号': seq_no,
             '客户': p.get('client_short', '') or '',
             '项目名称': (p.get('project_name', '') or '')[:35],
@@ -160,17 +149,12 @@ def _render_table(projects):
             '待收': remaining,
             '本次到账': 0.0,
             '到账状态': paid,
-            '成本细项': cost_txt,
-            '总成本': p.get('estimated_cost', 0) or 0,
-            '立项': '是' if p.get('feishu_approved') else '否',
-            '结案': CLOSURE_MAP.get(p.get('closure_status', 'active') or 'active', ''),
-            '阶段': STAGE_MAP.get(p.get('status', ''), p.get('status', '?')),
             '__id': p.get('id'),
         })
 
-    df = pd.DataFrame(rows)
-    display_cols = [c for c in df.columns if c != '__id']
-    read_only = [c for c in df.columns if c not in ('本次到账', '__id')]
+    df_pay = pd.DataFrame(rows_pay)
+    display_cols = [c for c in df_pay.columns if c != '__id']
+    read_only = [c for c in df_pay.columns if c not in ('本次到账', '__id')]
 
     col_cfg = {
         '序号': st.column_config.TextColumn('序号', pinned=True),
@@ -182,24 +166,19 @@ def _render_table(projects):
         '待收': st.column_config.NumberColumn('待收', format='%.0f'),
         '本次到账': st.column_config.NumberColumn('本次到账', format='%.0f', min_value=0.0),
         '到账状态': st.column_config.TextColumn('到账状态'),
-        '成本细项': st.column_config.TextColumn('成本细项'),
-        '总成本': st.column_config.NumberColumn('总成本', format='%.0f'),
-        '立项': st.column_config.TextColumn('立项'),
-        '结案': st.column_config.TextColumn('结案'),
-        '阶段': st.column_config.TextColumn('阶段'),
         '__id': None,
     }
 
-    st.caption('💡 在「本次到账」列输入金额 → 点下方「保存到账」批量入账。列多左右滑、行多上下滑。')
+    st.caption('💡 在「本次到账」列输入金额 → 点「保存到账」批量入账（到账就在这一行操作，不用往下拉）。')
     edited = st.data_editor(
-        df,
+        df_pay,
         key='overview_editor',
         column_config=col_cfg,
         column_order=display_cols,
         disabled=read_only,
         hide_index=True,
         use_container_width=True,
-        height=min(38 * (len(df) + 1) + 3, 600),
+        height=min(38 * (len(df_pay) + 1) + 3, 600),
     )
 
     if st.button('💾 保存到账', type='primary', use_container_width=True):
@@ -230,6 +209,129 @@ def _render_table(projects):
                 n_ok += 1
             st.success(f'✅ 已入账 {n_ok} 笔。到账项目会出现在上方「待开收据」，去那里开收据即可。')
             st.rerun()
+
+    # ============ ② 成本明细（原格式：每个成本细项一行，其他列 rowspan 合并） ============
+    st.divider()
+    st.subheader('成本明细')
+
+    COST_ORDER = {'拍摄': 1, '餐饮交通': 2, '兼职执行': 3, '发布': 4, '补发': 5}
+    COL_W = [50, 80, 180, 160]
+    CUM_W = [0, 50, 130, 310]
+
+    rows_html = ""
+    for seq_no, p in enumerate(projects, start=1):
+        stage = STAGE_MAP.get(p.get('status', ''), p.get('status', '?'))
+        closure = CLOSURE_MAP.get(p.get('closure_status', 'active'), '')
+        rcvd = p.get('received_amount', 0) or 0
+        total_amt = p.get('amount', 1) or 1
+        if p.get('payment_received'): paid = '✅ 全款'
+        elif rcvd > 0: paid = f'💵 {rcvd/total_amt*100:.0f}%'
+        else: paid = ''
+        feishu = '是' if p.get('feishu_approved') else '否'
+        total_cost = p.get('estimated_cost',0) or 0
+        exec_period = _fmt_exec(p.get('execution_period','') or '')
+        epd = p.get('expected_payment_date','')
+        if epd:
+            if hasattr(epd, 'strftime'): exp_pay = epd.strftime('%Y/%-m/%-d').replace('/0','/')
+            else: exp_pay = str(epd)[:10].replace('-','/')
+        else: exp_pay = ''
+        code = p.get('project_code','') or '待分配'
+
+        try: cost_items = json.loads(p.get('cost_breakdown','') or '[]')
+        except: cost_items = []
+
+        if cost_items:
+            cost_items.sort(key=lambda x: COST_ORDER.get(x.get('name',''), 99))
+
+        if cost_items:
+            n = len(cost_items)
+            for idx, item in enumerate(cost_items):
+                rows_html += "<tr>"
+                if idx == 0:
+                    rows_html += f"<td class='sticky-col' style='left:{CUM_W[0]}px;width:{COL_W[0]}px' rowspan='{n}'>{seq_no}</td>"
+                    rows_html += f"<td class='sticky-col' style='left:{CUM_W[1]}px;width:{COL_W[1]}px' rowspan='{n}'>{p.get('client_short','')}</td>"
+                    rows_html += f"<td class='sticky-col' style='left:{CUM_W[2]}px;width:{COL_W[2]}px;white-space:nowrap' rowspan='{n}'>{(p.get('project_name','') or '')[:35]}</td>"
+                    rows_html += f"<td class='sticky-col' style='left:{CUM_W[3]}px;width:{COL_W[3]}px' rowspan='{n}'>{code}</td>"
+                    rows_html += f"<td rowspan='{n}'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
+                    rows_html += f"<td rowspan='{n}'>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
+                    rows_html += f"<td rowspan='{n}'>{exec_period}</td>"
+                    rows_html += f"<td rowspan='{n}'>{exp_pay}</td>"
+                rows_html += f"<td>{item.get('name','')}</td>"
+                rows_html += f"<td style='text-align:right'>{item.get('amount',0):,.0f}</td>"
+                if idx == 0:
+                    rows_html += f"<td rowspan='{n}'>{total_cost:,.0f}</td>"
+                    rows_html += f"<td rowspan='{n}'>{feishu}</td>"
+                    rows_html += f"<td rowspan='{n}'>{paid}</td>"
+                    rows_html += f"<td rowspan='{n}'>{closure}</td>"
+                    rows_html += f"<td rowspan='{n}'>{stage}</td>"
+                rows_html += "</tr>"
+        else:
+            rows_html += "<tr>"
+            rows_html += f"<td class='sticky-col' style='left:{CUM_W[0]}px;width:{COL_W[0]}px'>{seq_no}</td>"
+            rows_html += f"<td class='sticky-col' style='left:{CUM_W[1]}px;width:{COL_W[1]}px'>{p.get('client_short','')}</td>"
+            rows_html += f"<td class='sticky-col' style='left:{CUM_W[2]}px;width:{COL_W[2]}px;white-space:nowrap'>{(p.get('project_name','') or '')[:35]}</td>"
+            rows_html += f"<td class='sticky-col' style='left:{CUM_W[3]}px;width:{COL_W[3]}px'>{code}</td>"
+            rows_html += f"<td>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
+            rows_html += f"<td>{p.get('currency','USD')} {p.get('amount',0):,.0f}</td>"
+            rows_html += f"<td>{exec_period}</td>"
+            rows_html += f"<td>{exp_pay}</td>"
+            rows_html += f"<td></td><td style='text-align:right'>{total_cost:,.0f}</td>"
+            rows_html += f"<td>{total_cost:,.0f}</td>"
+            rows_html += f"<td>{feishu}</td>"
+            rows_html += f"<td>{paid}</td>"
+            rows_html += f"<td>{closure}</td>"
+            rows_html += f"<td>{stage}</td>"
+            rows_html += "</tr>"
+
+    header_cells = ""
+    headers = ['序号','客户','项目名称','编号','确认函金额','Invoice金额','执行周期','预计付款','成本细项','成本金额','总成本','立项','到账','结案','阶段']
+    for i, h in enumerate(headers):
+        if i < 4:
+            header_cells += f"<th class='sticky-col sticky-header' style='left:{CUM_W[i]}px;width:{COL_W[i]}px'>{h}</th>"
+        else:
+            header_cells += f"<th class='sticky-header'>{h}</th>"
+
+    html = f"""
+    <style>
+    .table-wrap {{
+        overflow-x: auto; max-width: 100%; border: 1px solid #ddd;
+        -webkit-overflow-scrolling: touch;
+    }}
+    .table-wrap table {{
+        border-collapse: collapse; width: max-content; min-width: 1500px;
+        font-size: 14px; font-family: -apple-system, sans-serif;
+    }}
+    .table-wrap th, .table-wrap td {{
+        border: 1px solid #ddd; padding: 6px 8px; font-size: 14px;
+        text-align: center; vertical-align: middle;
+    }}
+    .table-wrap .sticky-header {{
+        background: #f0f0f0; position: sticky; top: 0; z-index: 3;
+    }}
+    .table-wrap .sticky-col {{
+        position: sticky; z-index: 2; background: #fff;
+    }}
+    .table-wrap .sticky-col.sticky-header {{
+        z-index: 4; background: #e8e8e8;
+    }}
+    .table-wrap tr:nth-child(even) .sticky-col {{
+        background: #fafafa;
+    }}
+    .table-wrap td {{
+        background: #fff;
+    }}
+    .table-wrap tr:nth-child(even) td {{
+        background: #fafafa;
+    }}
+    </style>
+    <div class="table-wrap">
+    <table>
+    <tr>{header_cells}</tr>
+    {rows_html}
+    </table>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def _export_excel(projects):
