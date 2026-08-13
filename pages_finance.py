@@ -14,6 +14,8 @@ from utils.generate import generate_cash_receipt
 
 STAGE_MAP = {'draft': '草稿', 'pending': '待审核', 'approved': '已开发票', 'rejected': '已驳回'}
 CLOSURE_MAP = {'active': '进行中', 'pending_payment': '待收款', 'closed': '已结案'}
+# 成本细项固定顺序：拍摄 → 餐饮交通 → 兼职执行 → 发布 → 补发
+COST_ORDER = {'拍摄': 1, '餐饮交通': 2, '兼职执行': 3, '发布': 4, '补发': 5}
 
 
 def _fmt_exec(val):
@@ -41,6 +43,7 @@ def _fmt_cost_line(cost_json: str) -> str:
     if not cost_json: return ""
     try:
         items = json.loads(cost_json)
+        items = sorted(items, key=lambda x: COST_ORDER.get(x.get('name',''), 99))
         return "、".join(f"{i['name']}({i.get('currency','RMB')}{i.get('amount',0):,.0f})" for i in items)
     except: return cost_json
 
@@ -128,8 +131,6 @@ def page_overview():
 
 def _render_table(projects):
     # 成本明细合在一列、按项换行竖排（每个成本项一行）
-    COST_ORDER = {'拍摄': 1, '餐饮交通': 2, '兼职执行': 3, '发布': 4, '补发': 5}
-
     rows = []
     max_items = 1
     for seq_no, p in enumerate(projects, start=1):
@@ -258,6 +259,8 @@ def _export_excel(projects):
         else: paid = '否'
         try: items=json.loads(p.get('cost_breakdown','') or '[]')
         except: items=[]
+        if items:
+            items = sorted(items, key=lambda x: COST_ORDER.get(x.get('name',''), 99))
         start_row = row
         total_cost = p.get('estimated_cost',0) or 0
         feishu = '是' if p.get('feishu_approved') else '否'
