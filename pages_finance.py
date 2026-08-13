@@ -192,60 +192,81 @@ def _render_table(projects):
         '客户': st.column_config.TextColumn('客户', pinned=True, width='small'),
         '项目名称': st.column_config.TextColumn('项目名称', pinned=True, width='medium'),
         '编号': st.column_config.TextColumn('编号', width='medium'),
-        '金额': st.column_config.NumberColumn('金额', format='%.0f', width='small'),
-        '已到账': st.column_config.NumberColumn('已到账', format='%.0f', width='small'),
-        '待收': st.column_config.NumberColumn('待收', format='%.0f', width='small'),
-        '本次到账': st.column_config.NumberColumn('本次到账', format='%.0f', min_value=0.0, width='small'),
-        '到账状态': st.column_config.TextColumn('到账状态', width='small'),
-        '总成本': st.column_config.NumberColumn('总成本', format='%.0f', width='small'),
+        '金额': st.column_config.NumberColumn('🟢 金额', format='%.0f', width='small'),
+        '已到账': st.column_config.NumberColumn('🟢 已到账', format='%.0f', width='small'),
+        '待收': st.column_config.NumberColumn('🟢 待收', format='%.0f', width='small'),
+        '本次到账': st.column_config.NumberColumn('🟢 本次到账', format='%.0f', min_value=0.0, width='small'),
+        '到账状态': st.column_config.TextColumn('🟢 到账状态', width='small'),
+        '总成本': st.column_config.NumberColumn('🟠 总成本', format='%.0f', width='small'),
         '立项': st.column_config.TextColumn('立项', width='small'),
         '结案': st.column_config.TextColumn('结案', width='small'),
         '阶段': st.column_config.TextColumn('阶段', width='small'),
         '__id': None,
     }
     for cc in cost_cols:
-        col_cfg[cc] = st.column_config.NumberColumn(cc, format='%.0f', width='small')
+        col_cfg[cc] = st.column_config.NumberColumn('🟠 ' + cc, format='%.0f', width='small')
 
-    st.caption('💡 在「本次到账」列输入金额 → 点「保存到账」批量入账。成本项多会自动多列，可左右滑动查看。')
-    edited = st.data_editor(
-        df,
-        key='overview_editor',
-        column_config=col_cfg,
-        column_order=display_cols,
-        disabled=read_only,
-        hide_index=True,
-        use_container_width=True,
-        height=min(38 * (len(df) + 1) + 3, 600),
-    )
+    st.caption('🟢 收入相关 ｜ 🟠 成本相关。在「🟢 本次到账」列输入金额，点下方「保存到账」。成本项多会自动多列，可左右滑动。')
 
-    if st.button('💾 保存到账', type='primary', use_container_width=True):
+    with st.form('overview_save_form'):
+        edited = st.data_editor(
+            df,
+            key='overview_editor',
+            column_config=col_cfg,
+            column_order=display_cols,
+            disabled=read_only,
+            hide_index=True,
+            use_container_width=True,
+            height=min(38 * (len(df) + 1) + 3, 600),
+        )
+        submitted = st.form_submit_button('💾 保存到账', type='primary', use_container_width=True)
+
+    if submitted:
         updates = []
         for _, row in edited.iterrows():
             amt = row.get('本次到账')
             if amt is None or pd.isna(amt):
                 amt = 0.0
-            amt = float(amt)
-            pid = row.get('__id')
-            if amt > 0 and pid is not None and not pd.isna(pid):
-                updates.append((int(pid), amt))
+            try:
+                amt = float(amt)
+            except (TypeError, ValueError):
+                amt = 0.0
+            seq = row.get('序号')
+            if amt <= 0 or seq is None or pd.isna(seq):
+                continue
+            try:
+                idx = int(float(seq)) - 1
+            except (TypeError, ValueError):
+                continue
+            if 0 <= idx < len(projects):
+                updates.append((projects[idx].get('id'), amt))
         if not updates:
-            st.warning('请先在「本次到账」列输入要入账的金额')
+            st.warning('请先在「🟢 本次到账」列输入要入账的金额，再点「保存到账」。')
         else:
             from utils.database import get_connection
             n_ok = 0
+            errs = []
             for pid, amt in updates:
                 orig = next((x for x in projects if x.get('id') == pid), None)
                 if orig is None:
                     continue
                 new_total = (orig.get('received_amount', 0) or 0) + amt
-                get_connection().table('projects').update({
-                    'received_amount': new_total,
-                    'payment_received': new_total >= (orig.get('amount', 0) or 0),
-                    'received_date': datetime.now().strftime('%Y-%m-%d'),
-                }).eq('id', pid).execute()
-                n_ok += 1
-            st.success(f'✅ 已入账 {n_ok} 笔。到账项目会出现在上方「待开收据」，去那里开收据即可。')
-            st.rerun()
+                try:
+                    get_connection().table('projects').update({
+                        'received_amount': new_total,
+                        'payment_received': new_total >= (orig.get('amount', 0) or 0),
+                        'received_date': datetime.now().strftime('%Y-%m-%d'),
+                    }).eq('id', pid).execute()
+                    n_ok += 1
+                except Exception as e:
+                    errs.append(str(e))
+            if n_ok:
+                st.success(f'✅ 已入账 {n_ok} 笔，刷新后「已到账」列会更新。到账项目可去上方「待开收据」开收据。')
+            if errs:
+                st.error(f'⚠️ {len(errs)} 笔入账失败，请重试或联系管理员。')
+            if n_ok:
+                st.session_state.pop('overview_editor', None)
+                st.rerun()
 
 
 def _export_excel(projects):
