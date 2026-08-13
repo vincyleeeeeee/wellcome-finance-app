@@ -73,23 +73,22 @@ def _amount_chinese(amount: float, currency: str = "USD") -> str:
     decimal_part = int(round((amount - integer_part) * 100))
 
     cn = _num_to_chinese(integer_part)
-    result = f"{cn}元"
-
-    # Currency suffix
-    suffix = "美元整" if currency == "USD" else "元整"
+    # 币种单位：美元 / 元（避免「元」与后缀「美元整」叠加成「元美元整」）
+    unit = "美元" if currency == "USD" else "元"
 
     if decimal_part > 0:
         jiao = decimal_part // 10
         fen = decimal_part % 10
+        result = f"{cn}{unit}"
         if jiao > 0:
             result += f"{_CN_DIGITS[jiao]}角"
         if fen > 0:
             result += f"{_CN_DIGITS[fen]}分"
-        result += suffix
-    else:
-        result += suffix
+        else:
+            result += "整"
+        return result
 
-    return result
+    return f"{cn}{unit}整"
 
 
 def generate_confirmation_letter(client: dict, project: dict) -> str:
