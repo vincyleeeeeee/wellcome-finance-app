@@ -221,6 +221,7 @@ def _render_table(projects):
             use_container_width=True,
             height=min(38 * (len(df) + 1) + 3, 600),
         )
+        received_date = st.date_input('📅 到账时间', value=datetime.now().date())
         submitted = st.form_submit_button('💾 保存到账', type='primary', use_container_width=True)
 
     if submitted:
@@ -257,7 +258,7 @@ def _render_table(projects):
                     get_connection().table('projects').update({
                         'received_amount': new_total,
                         'payment_received': new_total >= (orig.get('amount', 0) or 0),
-                        'received_date': datetime.now().strftime('%Y-%m-%d'),
+                        'received_date': received_date.strftime('%Y-%m-%d'),
                     }).eq('id', pid).execute()
                     n_ok += 1
                 except Exception as e:
