@@ -578,6 +578,8 @@ def _gen_stamped_only(p, output_path):
     client=get_client_by_id(p.get('client_id')) or {}
     wb=xl.load_workbook(os.path.join(TD,"Invoice-Template.xlsx")); ws=wb.active
     ws['C3']=f"{p.get('brand_name','')} – {p.get('total_posts','')} CONTENT PACKAGE"
+    ws['C4']=p.get('execution_period','') or ''
+    ws['C5']=p.get('venue','') or ''
     ws['C7']=client.get('full_name',''); ws['C8']=client.get('address','')
     ws['C9']=client.get('contact',''); ws['C10']=client.get('phone') or ''
     ws['C11']=client.get('email') or ''; ws['E8']=code
@@ -610,6 +612,8 @@ def _regen_and_approve(p, user_id):
     client=get_client_by_id(p.get('client_id')) or {}
     wb=xl.load_workbook(os.path.join(TD,"Invoice-Template.xlsx")); ws=wb.active
     ws['C3']=f"{p.get('brand_name','')} – {p.get('total_posts','')} CONTENT PACKAGE"
+    ws['C4']=p.get('execution_period','') or ''
+    ws['C5']=p.get('venue','') or ''
     ws['C7']=client.get('full_name',''); ws['C8']=client.get('address','')
     ws['C9']=client.get('contact','')
     ws['C10']=client.get('phone') if client.get('phone') and client['phone']!='（待补充）' else None
