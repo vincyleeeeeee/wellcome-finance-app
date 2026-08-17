@@ -2,7 +2,7 @@
 
 import streamlit as st
 from datetime import datetime
-import os, json, base64
+import os, json, base64, re
 from utils.database import (get_clients, get_client_by_id, get_project_by_id,
                             save_project, get_all_users,
                             get_connection)
@@ -140,6 +140,34 @@ def _quick_create(client_names, cmap, user):
             st.success("✅ 已创建！"); st.rerun()
 
 
+def _parse_exec_period(period):
+    """从执行周期字符串解析 (start, end) datetime；失败返回 (None, None)。"""
+    if not period:
+        return None, None
+    s = str(period)
+    # 数字格式：2026/8/13 - 2026/12/31
+    m = re.search(r'(\d{4})/(\d{1,2})/(\d{1,2})\s*[-–~到]\s*(\d{4})/(\d{1,2})/(\d{1,2})', s)
+    if m:
+        try:
+            return (datetime(int(m.group(1)), int(m.group(2)), int(m.group(3))),
+                    datetime(int(m.group(4)), int(m.group(5)), int(m.group(6))))
+        except (ValueError, IndexError):
+            pass
+    # 英文格式：Aug - Dec 2026
+    _mon = {'jan':1,'feb':2,'mar':3,'apr':4,'may':5,'jun':6,'jul':7,'aug':8,'sep':9,'oct':10,'nov':11,'dec':12}
+    m = re.search(r'([A-Za-z]{3,})\.?\s*[-–~到]\s*([A-Za-z]{3,})\.?\s*(\d{4})', s)
+    if m:
+        try:
+            y = int(m.group(3))
+            mo1 = _mon.get(m.group(1)[:3].lower())
+            mo2 = _mon.get(m.group(2)[:3].lower())
+            if mo1 and mo2:
+                return datetime(y, mo1, 1), datetime(y, mo2, 1)
+        except (ValueError, IndexError):
+            pass
+    return None, None
+
+
 def _show_info(edit_data, client_names, cmap, user):
     st.subheader("📝 项目基本信息")
     col1, col2 = st.columns(2)
@@ -177,13 +205,21 @@ def _show_info(edit_data, client_names, cmap, user):
 
     with col2:
         st.text_input("执行地点", value=edit_data.get('venue','') or 'Bangkok', key="ei_venue")
+        # 从已有执行周期回填起止日期（否则编辑时总是显示今天、保存会覆盖原值）
+        exec_start_default, exec_end_default = _parse_exec_period(edit_data.get('execution_period',''))
+        exec_start_default = exec_start_default or datetime.now()
+        exec_end_default = exec_end_default or datetime.now()
         col_start, col_end = st.columns(2)
         with col_start:
-            exec_start = st.date_input("项目开始", value=datetime.now(), key="ei_start")
+            exec_start = st.date_input("项目开始", value=exec_start_default, key=f"ei_start_{edit_data.get('id')}")
         with col_end:
-            exec_end = st.date_input("项目结束", value=datetime.now(), key="ei_end")
-        # Auto-generate execution period
-        exec_period_auto = f"{exec_start.strftime('%Y/%-m/%-d')} - {exec_end.strftime('%Y/%-m/%-d')}"
+            exec_end = st.date_input("项目结束", value=exec_end_default, key=f"ei_end_{edit_data.get('id')}")
+        # Auto-generate execution period（英文月份缩写，如 Aug - Dec 2026）
+        _months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+        if exec_start.year == exec_end.year:
+            exec_period_auto = f"{_months[exec_start.month-1]} - {_months[exec_end.month-1]} {exec_end.year}"
+        else:
+            exec_period_auto = f"{_months[exec_start.month-1]} {exec_start.year} - {_months[exec_end.month-1]} {exec_end.year}"
         st.caption(f"执行周期：{exec_period_auto}")
         st.text_input("拍摄时间", value=edit_data.get('shooting_date',''), key="ei_shoot")
         st.text_input("总篇数", value=edit_data.get('total_posts',''), key="ei_posts",
