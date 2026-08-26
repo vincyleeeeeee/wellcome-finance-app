@@ -432,16 +432,19 @@ def _act_submit(ed, user):
             default_amt = total_contract
             inv_type_default = "服务款-全款"
 
+        # 分期设置变化时，自动同步「本次开票金额」= 总额 ÷ 次数（手动改过则保留手动值）
+        _prev_inst = st.session_state.get('_prev_inst')
+        _cur_inst = (inst_total, inst_cur)
+        if _prev_inst != _cur_inst:
+            st.session_state['_prev_inst'] = _cur_inst
+            st.session_state['inv_amt'] = default_amt
+
         inv_type = st.selectbox("发票类型",
                                ["服务款-全款","服务款-前款","服务款-中款","服务款-后款","样品费报销","差旅费报销"],
                                index=0, key="inv_type")
         inv_amount = st.number_input("本次开票金额", value=default_amt if default_amt>0 else None,
                                      step=100.0, key="inv_amt",
-                                     help=f"合同总额：{ed.get('currency','USD')} {total_contract:,.2f}")
-        # Force update amount when installment changes
-        if 'inv_amt' in st.session_state and st.session_state['inv_amt'] != default_amt and inst_total > 1:
-            st.session_state['inv_amt'] = default_amt
-            st.rerun()
+                                     help=f"合同总额：{ed.get('currency','USD')} {total_contract:,.2f}（改动开票次数会自动重算）")
         inv_note = st.text_area("备注", key="inv_note", placeholder="说明本次开票内容...")
 
         c1,c2=st.columns(2)
