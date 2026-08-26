@@ -422,7 +422,12 @@ def _act_submit(ed, user):
                                   help="全款选1，分两次选2")
         if inst_total > 1:
             inst_cur = st.selectbox("本次是第几次", list(range(1, inst_total+1)), key="inst_cur")
-            inst_amt = round(total_contract / inst_total, 2)
+            # 前 N-1 期平均分（四舍五入到分），最后一期补差额，保证总和精确等于总额
+            each_amt = round(total_contract / inst_total, 2)
+            if inst_cur == inst_total:
+                inst_amt = round(total_contract - each_amt * (inst_total - 1), 2)
+            else:
+                inst_amt = each_amt
             st.info(f"本次金额：**{ed.get('currency','USD')} {inst_amt:,.2f}** | 第{inst_cur}次/共{inst_total}次")
             default_amt = inst_amt
             inv_type_default = f"服务款-第{inst_cur}次款项"
