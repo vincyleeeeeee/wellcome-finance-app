@@ -203,6 +203,24 @@ def page_workspace():
                 if st.button("📄 编辑项目", key=f"ws_op_{pid}", use_container_width=True):
                     st.session_state['edit_project_id'] = pid
                     st.session_state.page = "generate"; st.rerun()
+                # 删除项目（仅本人或 admin，二次确认）
+                if user['id'] == p.get('created_by') or user['role'] == 'admin':
+                    if st.session_state.get('ws_del_pid') == pid:
+                        st.caption("⚠️ 删除后不可恢复")
+                        dd1, dd2 = st.columns(2)
+                        with dd1:
+                            if st.button("✅ 确认删除", key=f"ws_dely_{pid}", use_container_width=True):
+                                get_connection().table("projects").delete().eq("id", pid).execute()
+                                st.session_state.pop('ws_del_pid', None)
+                                st.success("已删除"); st.rerun()
+                        with dd2:
+                            if st.button("❌ 取消", key=f"ws_deln_{pid}", use_container_width=True):
+                                st.session_state.pop('ws_del_pid', None)
+                                st.rerun()
+                    else:
+                        if st.button("🗑️ 删除", key=f"ws_del_{pid}", use_container_width=True):
+                            st.session_state['ws_del_pid'] = pid
+                            st.rerun()
                 if p.get('status') in ('draft','rejected') and user['id'] == p.get('created_by'):
                     if st.button("📤 提交审核", key=f"ws_sub_{pid}", use_container_width=True):
                         submit_for_approval(pid); st.success("已提交"); st.rerun()
