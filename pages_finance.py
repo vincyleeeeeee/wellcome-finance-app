@@ -386,7 +386,7 @@ def page_approval():
                             try:
                                 _regen_and_approve(p, user['id'])
                                 st.success("已通过！")
-                                code = p.get('project_code','')
+                                code = (p.get('project_code','') or '').strip()
                                 month_str = code[8:10] if len(code)>=8 else ''
                                 MONTHS = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
                                           '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
@@ -464,7 +464,7 @@ def page_approval():
         for p in approved_list[:20]:
             pid2 = p['id']
             name = (p.get('project_name','') or p.get('brand_name',''))[:60]
-            code = p.get('project_code','')
+            code = (p.get('project_code','') or '').strip()
 
             c1,c2,c3 = st.columns([5,1,1])
             with c1:
@@ -538,7 +538,7 @@ def _gen_invoice_dl(p):
         if not client: return
 
         # Auto-assign code if empty (preview before approval)
-        code = p.get('project_code','')
+        code = (p.get('project_code','') or '').strip()
         if not code:
             code = generate_project_code(datetime.now().strftime('%Y-%m-%d'))
             get_connection().table("projects").update({"project_code": code}).eq("id", p['id']).execute()
@@ -604,7 +604,7 @@ def _gen_stamped_only(p, output_path):
     from utils.database import generate_project_code, get_connection
 
     # Safety: auto-assign code if somehow still empty
-    code = p.get('project_code','')
+    code = (p.get('project_code','') or '').strip()
     if not code:
         code = generate_project_code(datetime.now().strftime('%Y-%m-%d'))
         get_connection().table("projects").update({"project_code": code}).eq("id", p['id']).execute()
@@ -639,7 +639,7 @@ def _regen_and_approve(p, user_id):
     from utils.database import generate_project_code, get_connection
 
     # Auto-assign project code based on today if still empty
-    code = p.get('project_code','')
+    code = (p.get('project_code','') or '').strip()
     if not code:
         code = generate_project_code(datetime.now().strftime('%Y-%m-%d'))
         get_connection().table("projects").update({"project_code": code}).eq("id", p['id']).execute()

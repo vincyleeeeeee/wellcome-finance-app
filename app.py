@@ -785,25 +785,35 @@ def page_history():
                 st.caption(" | ".join(info_parts))
 
             with cc2:
-                if p.get('status') == 'approved' and p.get('stamped_pdf_path'):
-                    stamped = p['stamped_pdf_path']
-                    if os.path.exists(stamped):
-                        with open(stamped, "rb") as f:
-                            code_p = p.get('project_code','')
-                            ms = code_p[6:8] if len(code_p)>=8 else ''
+                if p.get('status') == 'approved':
+                    # 实时重新生成（避免下载到审批时缓存于 stamped_pdf_path 的旧币种版本）
+                    from pages_finance import _gen_stamped_only
+                    import tempfile as _tf
+                    _tmp = _tf.mktemp(suffix='.pdf')
+                    try:
+                        _gen_stamped_only(p, _tmp)
+                        with open(_tmp, "rb") as f:
+                            code_p = (p.get('project_code','') or '').strip()
+                            ms = code_p[8:10] if len(code_p)>=15 else ''
                             M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
                             fname = f"{p.get('brand_name','')}-{M.get(ms,'')}-invoice.pdf"
                             st.download_button("📥 盖章PDF", f, file_name=fname,
                                              key=f"hist_stamped_{p['id']}", use_container_width=True)
-                            # Email template
-                            with st.expander("📧 邮件文案", expanded=False):
-                                code_p2 = p.get('project_code','')
-                                ms2 = code_p2[6:8] if len(code_p2)>=8 else ''
-                                M2 = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
-                                subj = f"Invoice for {p.get('brand_name','')} {M2.get(ms2,'')} Campaign / {code_p2}"
-                                body = f"Dear all,\n\nPlease find attached the invoice for {p.get('brand_name','')} {p.get('project_name','')} Project.\n\nAmount: {p.get('currency','USD')} {p.get('amount',0):,.2f}\nInvoice No: {code_p2}\n\nPlease review at your convenience and let us know if you have any questions.\nThank you for your kind attention."
-                                st.text_input("主题", value=subj, key=f"histsubj_{p['id']}")
-                                st.text_area("正文", value=body, height=150, key=f"histbody_{p['id']}")
+                    except Exception:
+                        pass
+                    try:
+                        os.unlink(_tmp)
+                    except Exception:
+                        pass
+                    # Email template
+                    with st.expander("📧 邮件文案", expanded=False):
+                        code_p2 = (p.get('project_code','') or '').strip()
+                        ms2 = code_p2[8:10] if len(code_p2)>=15 else ''
+                        M2 = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
+                        subj = f"Invoice for {p.get('brand_name','')} {M2.get(ms2,'')} Campaign / {code_p2}"
+                        body = f"Dear all,\n\nPlease find attached the invoice for {p.get('brand_name','')} {p.get('project_name','')} Project.\n\nAmount: {p.get('currency','USD')} {p.get('amount',0):,.2f}\nInvoice No: {code_p2}\n\nPlease review at your convenience and let us know if you have any questions.\nThank you for your kind attention."
+                        st.text_input("主题", value=subj, key=f"histsubj_{p['id']}")
+                        st.text_area("正文", value=body, height=150, key=f"histbody_{p['id']}")
                 elif p.get('status') in ('draft', 'rejected') and user['id'] == p.get('created_by'):
                     if st.button("📤 提交审核", key=f"submit_hist_{p['id']}", use_container_width=True):
                         submit_for_approval(p['id'])
