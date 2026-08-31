@@ -554,6 +554,7 @@ def _gen_invoice_dl(p):
         ws['D15']=inv_amt; ws['E15']=1; ws['G15']=inv_amt
         ws['E9']=_fmt_date_val(p.get('invoice_date'))
         ws['E10']=_fmt_date_val(p.get('due_date'))
+        _set_currency_headers(ws, p.get('currency','USD'))
         _set_c16(ws, p.get("content_type",""))
         _write_c18(ws, inv_amt, p.get('currency','USD'))
         buf=io.BytesIO(); wb.save(buf); buf.seek(0)
@@ -585,6 +586,16 @@ def _write_c18(ws, amount, currency):
     ws['C18'] = f"總付款金額為{cn}\nFull payment of {cl} {amount:,.2f}"
 
 
+def _set_currency_headers(ws, currency):
+    """根据币种设置 D13/G13 单价/小计表头（模板默认美元，人民币项目须覆盖）。"""
+    if currency == 'RMB':
+        ws['D13'] = '單價（人民幣）\nUNIT PRICE (RMB)'
+        ws['G13'] = '小計（人民幣）\nAMOUNT (RMB)'
+    else:
+        ws['D13'] = '單價（美元）\nUNIT PRICE (USD)'
+        ws['G13'] = '小計（美元）\nAMOUNT (USD)'
+
+
 def _gen_stamped_only(p, output_path):
     """Generate stamped PDF without approving (for re-download)."""
     import openpyxl as xl
@@ -609,6 +620,7 @@ def _gen_stamped_only(p, output_path):
     ws['E9']=_fmt_date_val(p.get('invoice_date')); ws['E10']=_fmt_date_val(p.get('due_date'))
     inv_amt = invoice_amount(p)
     ws['E11']=code; ws['D15']=inv_amt; ws['E15']=1; ws['G15']=inv_amt
+    _set_currency_headers(ws, p.get('currency','USD'))
     _set_c16(ws, p.get("content_type",""))
     _write_c18(ws, inv_amt, p.get('currency','USD'))
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
@@ -647,6 +659,7 @@ def _regen_and_approve(p, user_id):
     inv_amt = invoice_amount(p)
     ws['E11']=code; ws['D15']=inv_amt
     ws['E15']=1; ws['G15']=inv_amt
+    _set_currency_headers(ws, p.get('currency','USD'))
     _set_c16(ws, p.get("content_type",""))
     _write_c18(ws, inv_amt, p.get('currency','USD'))
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
