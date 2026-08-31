@@ -587,17 +587,18 @@ def _write_c18(ws, amount, currency):
 
 
 def _set_currency_headers(ws, currency):
-    """根据币种设置 D13/G13 表头 + D15/G15 货币符号格式（模板默认美元，人民币项目须覆盖）。"""
+    """根据币种设置 D13/G13 表头 + 金额单元格（D15/G15/G17/G18/G19）货币符号格式。
+    模板默认美元，人民币项目须覆盖（含「金額總計」合计行 G19）。"""
     if currency == 'RMB':
         ws['D13'] = '單價（人民幣）\nUNIT PRICE (RMB)'
         ws['G13'] = '小計（人民幣）\nAMOUNT (RMB)'
-        ws['D15'].number_format = '¥#,##0.00'
-        ws['G15'].number_format = '¥#,##0.00'
+        fmt = '¥#,##0.00'
     else:
         ws['D13'] = '單價（美元）\nUNIT PRICE (USD)'
         ws['G13'] = '小計（美元）\nAMOUNT (USD)'
-        ws['D15'].number_format = '$#,##0.00'
-        ws['G15'].number_format = '$#,##0.00'
+        fmt = '$#,##0.00'
+    for cell in ('D15', 'G15', 'G17', 'G18', 'G19'):
+        ws[cell].number_format = fmt
 
 
 def _gen_stamped_only(p, output_path):

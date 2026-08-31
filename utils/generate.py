@@ -217,8 +217,9 @@ def generate_invoice(client: dict, project: dict) -> str:
     ws['D15'] = amount
     ws['E15'] = 1
     ws['G15'] = amount
-    ws['D15'].number_format = '¥#,##0.00' if is_rmb else '$#,##0.00'
-    ws['G15'].number_format = '¥#,##0.00' if is_rmb else '$#,##0.00'
+    _fmt = '¥#,##0.00' if is_rmb else '$#,##0.00'
+    for _c in ('D15', 'G15', 'G17', 'G18', 'G19'):
+        ws[_c].number_format = _fmt
 
     # Description
     cn_amount = _amount_chinese(amount, currency)
