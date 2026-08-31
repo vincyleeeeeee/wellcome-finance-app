@@ -2,6 +2,7 @@
 
 import os
 import hashlib
+import time
 from datetime import datetime
 from typing import Optional, Tuple, List, Dict, Any
 
@@ -218,7 +219,18 @@ def get_projects(limit: int = 50, status: str = None) -> List[Dict]:
     query = sb.table("projects").select("*, clients(short_name, full_name)").order("project_code", desc=True).limit(limit)
     if status:
         query = query.eq("status", status)
-    result = query.execute()
+    # 境外网络偶发抖动，自动重试几次避免整页崩溃
+    result = None
+    last_err = None
+    for _attempt in range(3):
+        try:
+            result = query.execute()
+            break
+        except Exception as e:
+            last_err = e
+            time.sleep(0.6 * (_attempt + 1))
+    if result is None:
+        raise last_err
     data = result.data or []
     for p in data:
         if p.get("clients"):
