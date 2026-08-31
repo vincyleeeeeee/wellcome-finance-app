@@ -499,7 +499,15 @@ def _act_submit(ed, user):
         # Step 2: Submit
         st.success("✅ 信息已确认，请点击下方按钮提交")
         f_ok = st.checkbox("已在飞书立项", value=ed.get('feishu_approved',False))
-        inv_type = st.session_state.get('inv_type','服务款-全款')
+        it = st.session_state.get('_inst_total', 1) or 1
+        ic = st.session_state.get('_inst_cur', 1) or 1
+        # 分期时发票类型强制随期次（前款/中款/后款），避免「分期第1次 + 全款」矛盾
+        if it > 1:
+            if ic == 1: inv_type = "服务款-前款"
+            elif ic == it: inv_type = "服务款-后款"
+            else: inv_type = "服务款-中款"
+        else:
+            inv_type = st.session_state.get('inv_type','服务款-全款')
         inv_amt = st.session_state.get('inv_amt',ed.get('amount',0))
         st.write(f"发票类型：**{inv_type}** | 金额：{ed.get('currency','USD')} {inv_amt:,.2f}")
 
@@ -511,8 +519,6 @@ def _act_submit(ed, user):
         with col_submit:
             if st.button("📤 提交财务审核", type="primary", use_container_width=True):
                 note = st.session_state.get('inv_note','')
-                it = st.session_state.get('_inst_total', 1) or 1
-                ic = st.session_state.get('_inst_cur', 1) or 1
                 # 追加费用（产品费用等）
                 _xf = st.session_state.get('extra_fee', 0) or 0
                 _xc = st.session_state.get('extra_fee_cur', 'RMB') or 'RMB'
