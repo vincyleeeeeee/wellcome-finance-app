@@ -503,6 +503,13 @@ def _show_invoice_preview(p):
     if it > 1:
         inst_row = (f"<tr><td style='padding:3px 8px;color:#888'>期次</td>"
                     f"<td>第{ic}次/共{it}次（合同总额 {cur} {total:,.2f}）</td></tr>")
+    extra_fee = p.get('extra_fee', 0) or 0
+    extra_row = ""
+    if extra_fee > 0:
+        ec = p.get('extra_fee_currency','RMB') or 'RMB'
+        en = p.get('extra_fee_note','') or ''
+        extra_row = (f"<tr><td style='padding:3px 8px;color:#888'>追加费用</td>"
+                     f"<td>{ec} {extra_fee:,.2f}" + (f"（{en}）" if en else "") + f"</td></tr>")
 
     st.markdown(f"""
     <div style="border:1px solid #ddd;border-radius:8px;padding:12px;margin:8px 0;background:#fafafa">
@@ -514,6 +521,7 @@ def _show_invoice_preview(p):
     <tr><td style="padding:3px 8px;color:#888">发票类型</td><td>{p.get('content_type','') or '—'}</td></tr>
     <tr><td style="padding:3px 8px;color:#888">本次开票金额</td><td><b>{cur} {amt:,.2f}</b></td></tr>
     {inst_row}
+    {extra_row}
     <tr><td style="padding:3px 8px;color:#888">到期日</td><td>{str(p.get('due_date',''))[:10]}</td></tr>
     </table>
     </div>

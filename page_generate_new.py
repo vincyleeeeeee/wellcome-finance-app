@@ -417,11 +417,15 @@ def _act_submit(ed, user):
         st.success("✅ 条件满足，请核对信息并补充")
         client = get_client_by_id(ed.get('client_id')) or {}
 
-        # Split payment
+        # Split payment（续开下一期时用项目已有分期信息回填）
         total_contract = float(ed.get('amount',0))
+        if 'inst_total' not in st.session_state:
+            st.session_state['inst_total'] = int(ed.get('installment_total',1) or 1)
         inst_total = st.selectbox("分几次付款", [1,2,3,4,5], key="inst_total",
                                   help="全款选1，分两次选2")
         if inst_total > 1:
+            if 'inst_cur' not in st.session_state:
+                st.session_state['inst_cur'] = min(int(ed.get('installment_current',1) or 1), inst_total)
             inst_cur = st.selectbox("本次是第几次", list(range(1, inst_total+1)), key="inst_cur")
             # 前 N-1 期平均分（四舍五入到分），最后一期补差额，保证总和精确等于总额
             each_amt = round(total_contract / inst_total, 2)
@@ -429,8 +433,7 @@ def _act_submit(ed, user):
                 inst_amt = round(total_contract - each_amt * (inst_total - 1), 2)
             else:
                 inst_amt = each_amt
-            st.info(f"本次金额：**{ed.get('currency','USD')} {inst_amt:,.2f}** | 第{inst_cur}次/共{inst_total}次")
-            default_amt = inst_amt
+            st.info(f"本期金额：**{ed.get('currency','USD')} {inst_amt:,.2f}** | 第{inst_cur}次/共{inst_total}次")
             # 发票类型随期次联动：第1次=前款，最后一次=尾款，中间=中款
             if inst_cur == 1:
                 inv_type_default = "服务款-前款"
@@ -441,12 +444,28 @@ def _act_submit(ed, user):
         else:
             inst_cur = 1
             inst_amt = total_contract
-            default_amt = total_contract
             inv_type_default = "服务款-全款"
 
-        # 分期设置变化时，自动同步「本次开票金额」与「发票类型」（手动改过则保留手动值）
+        # 追加费用（产品费用等，可选），按汇率折算进本次开票金额
+        _RATE = {"USD":7.2,"RMB":1.0,"THB":0.2,"MYR":1.55}
+        st.divider()
+        st.caption("➕ 追加费用（可选）：如产品费用，将按汇率折算进本次开票金额")
+        ec1, ec2 = st.columns(2)
+        with ec1:
+            extra_fee = st.number_input("追加费用金额", min_value=0.0, step=0.01, value=0.0, key="extra_fee")
+        with ec2:
+            extra_cur = st.selectbox("追加费用币种", ["RMB","USD","THB","MYR"], key="extra_fee_cur")
+        extra_note = st.text_input("追加费用说明", key="extra_fee_note", placeholder="如：产品费用 158.49 人民币")
+        extra_usd = round((extra_fee or 0) * _RATE.get(extra_cur,1.0) / 7.2, 2)
+        if extra_usd > 0:
+            st.caption(f"折算：{extra_cur} {extra_fee:,.2f} ≈ USD {extra_usd:,.2f}")
+
+        # 本次开票金额 = 本期金额 + 追加费用折算
+        default_amt = round(inst_amt + extra_usd, 2)
+
+        # 分期/追加费用变化时，自动同步「本次开票金额」与「发票类型」
         _prev_inst = st.session_state.get('_prev_inst')
-        _cur_inst = (inst_total, inst_cur)
+        _cur_inst = (inst_total, inst_cur, extra_fee, extra_cur)
         if _prev_inst != _cur_inst:
             st.session_state['_prev_inst'] = _cur_inst
             st.session_state['inv_amt'] = default_amt
@@ -457,8 +476,8 @@ def _act_submit(ed, user):
                                index=_inv_types.index(inv_type_default) if inv_type_default in _inv_types else 0,
                                key="inv_type")
         inv_amount = st.number_input("本次开票金额", value=default_amt if default_amt>0 else None,
-                                     step=100.0, key="inv_amt",
-                                     help=f"合同总额：{ed.get('currency','USD')} {total_contract:,.2f}（改动开票次数会自动重算）")
+                                     step=0.01, key="inv_amt",
+                                     help=f"合同总额：{ed.get('currency','USD')} {total_contract:,.2f}（改动开票次数/追加费用会自动重算）")
         inv_note = st.text_area("备注", key="inv_note", placeholder="说明本次开票内容...")
 
         c1,c2=st.columns(2)
@@ -494,12 +513,19 @@ def _act_submit(ed, user):
                 note = st.session_state.get('inv_note','')
                 it = st.session_state.get('_inst_total', 1) or 1
                 ic = st.session_state.get('_inst_cur', 1) or 1
-                # 注意：amount 保持合同总额不变；本次开票金额由 installment_total/current 推导（invoice_amount）
+                # 追加费用（产品费用等）
+                _xf = st.session_state.get('extra_fee', 0) or 0
+                _xc = st.session_state.get('extra_fee_cur', 'RMB') or 'RMB'
+                _xn = st.session_state.get('extra_fee_note', '') or ''
+                # 注意：amount 保持合同总额不变；本次开票金额由 installment_total/current + extra_fee 推导（invoice_amount）
                 get_connection().table("projects").update({
                     "feishu_approved":f_ok, "status":"pending",
                     "content_type": inv_type + (f" [{note}]" if note else ""),
                     "installment_total": it,
                     "installment_current": ic,
+                    "extra_fee": float(_xf),
+                    "extra_fee_currency": _xc,
+                    "extra_fee_note": _xn,
                 }).eq("id",ed['id']).execute()
                 st.session_state['invoice_confirmed'] = False
                 st.success(f"✅ {inv_type} 已提交！等待财务审核。")
@@ -508,6 +534,21 @@ def _act_submit(ed, user):
 
 def _act_approved(ed, user):
     st.success("✅ 财务已通过！")
+    it = int(ed.get('installment_total',1) or 1)
+    ic = int(ed.get('installment_current',1) or 1)
+    # 分期未开完 → 提供「续开下一期」入口
+    if it > 1 and ic < it:
+        st.info(f"本项目分 {it} 期，已开第 {ic} 期（{ed.get('content_type','') or '—'}），还可开第 {ic+1} 期")
+        if st.button("📄 开下一期发票", type="primary", use_container_width=True):
+            get_connection().table("projects").update({
+                "status": "stamped_uploaded",
+                "installment_current": ic + 1,
+            }).eq("id", ed['id']).execute()
+            # 清理开票相关 session_state，让下一期表单干净回填
+            for k in ['invoice_confirmed','_prev_inst','inst_total','inst_cur',
+                      'inv_amt','inv_type','inv_note','extra_fee','extra_fee_cur','extra_fee_note']:
+                st.session_state.pop(k, None)
+            st.rerun()
     if ed.get('payment_received'):
         if st.button("🧾 开收据", type="primary", use_container_width=True):
             st.session_state['receipt_project_id'] = ed['id']

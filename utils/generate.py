@@ -91,17 +91,33 @@ def _amount_chinese(amount: float, currency: str = "USD") -> str:
     return f"{cn}{unit}整"
 
 
+# 汇率（折算成 RMB）：1 单位外币 = ? RMB
+_RATE_TO_RMB = {"USD": 7.2, "RMB": 1.0, "THB": 0.2, "MYR": 1.55}
+
+
+def _extra_fee_amount(project: dict) -> float:
+    """追加费用（产品费用等）按汇率折算成项目币种金额。"""
+    extra = float(project.get('extra_fee', 0) or 0)
+    if extra <= 0:
+        return 0.0
+    cur = project.get('extra_fee_currency', 'RMB') or 'RMB'
+    rmb = extra * _RATE_TO_RMB.get(cur, 1.0)
+    if (project.get('currency', 'USD') or 'USD') == 'RMB':
+        return round(rmb, 2)
+    return round(rmb / 7.2, 2)
+
+
 def invoice_amount(project: dict) -> float:
-    """本次开票金额：分期则取单次金额（平均分 + 末期补差额），全款则为总额。"""
+    """本次开票金额：分期则取单次金额（平均分 + 末期补差额），全款则为总额；另有追加费用则折算并入。"""
     total = float(project.get('amount', 0) or 0)
     it = project.get('installment_total', 1) or 1
     ic = project.get('installment_current', 1) or 1
     if it > 1:
         each = round(total / it, 2)
-        if ic == it:
-            return round(total - each * (it - 1), 2)
-        return each
-    return total
+        base = round(total - each * (it - 1), 2) if ic == it else each
+    else:
+        base = total
+    return round(base + _extra_fee_amount(project), 2)
 
 
 def generate_confirmation_letter(client: dict, project: dict) -> str:
