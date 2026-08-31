@@ -524,6 +524,7 @@ def _act_submit(ed, user):
                 _xc = st.session_state.get('extra_fee_cur', 'RMB') or 'RMB'
                 _xn = st.session_state.get('extra_fee_note', '') or ''
                 # 注意：amount 保持合同总额不变；本次开票金额由 installment_total/current + extra_fee 推导（invoice_amount）
+                # 提交时把发票日期默认设为提交当天（特殊指定可在提交后改 invoice_date 覆盖）
                 get_connection().table("projects").update({
                     "feishu_approved":f_ok, "status":"pending",
                     "content_type": inv_type + (f" [{note}]" if note else ""),
@@ -532,6 +533,7 @@ def _act_submit(ed, user):
                     "extra_fee": float(_xf),
                     "extra_fee_currency": _xc,
                     "extra_fee_note": _xn,
+                    "invoice_date": datetime.now().strftime('%Y-%m-%d'),
                 }).eq("id",ed['id']).execute()
                 st.session_state['invoice_confirmed'] = False
                 st.success(f"✅ {inv_type} 已提交！等待财务审核。")
