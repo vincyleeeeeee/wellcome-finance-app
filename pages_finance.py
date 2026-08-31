@@ -10,7 +10,7 @@ from utils.database import (
     approve_project, reject_project
 )
 from utils.receipt_pdf import generate_receipt_pdf
-from utils.generate import generate_cash_receipt
+from utils.generate import generate_cash_receipt, invoice_amount
 
 STAGE_MAP = {'draft': '草稿', 'pending': '待审核', 'approved': '已开发票', 'rejected': '已驳回'}
 CLOSURE_MAP = {'active': '进行中', 'pending_payment': '待收款', 'closed': '已结案'}
@@ -357,7 +357,12 @@ def page_approval():
                 feishu_badge = "✅ 飞书已立项" if p.get('feishu_approved') else "⚠️ 未确认飞书立项"
                 col_info,col_btn=st.columns([3,2])
                 with col_info:
-                    st.write(f"**{p.get('client_short','')}** | {p.get('currency','USD')} **{p.get('amount',0):,.2f}** | {feishu_badge}")
+                    _inv_amt = invoice_amount(p)
+                    _total = p.get('amount', 0) or 0
+                    _it = p.get('installment_total', 1) or 1
+                    _ic = p.get('installment_current', 1) or 1
+                    _inst_note = f"（第{_ic}/{_it}次，合同总额 {p.get('currency','USD')} {_total:,.2f}）" if _it > 1 else ""
+                    st.write(f"**{p.get('client_short','')}** | {p.get('currency','USD')} **{_inv_amt:,.2f}**{_inst_note} | {feishu_badge}")
                     if p.get('estimated_cost'):
                         cd=_fmt_cost_line(p.get('cost_breakdown','') or '')
                         st.caption(f"预估成本: {p.get('estimated_cost',0):,.0f}"+(f"（{cd}）" if cd else ""))
@@ -389,7 +394,7 @@ def page_approval():
                                 subj = f"Invoice for {p.get('brand_name','')} {m} Campaign / {p.get('project_code','')}"
                                 body = (f"Dear all,\n\n"
                                         f"Please find attached the invoice for {p.get('brand_name','')} {p.get('project_name','')} Project.\n\n"
-                                        f"Amount: {p.get('currency','USD')} {p.get('amount',0):,.2f}\n"
+                                        f"Amount: {p.get('currency','USD')} {invoice_amount(p):,.2f}\n"
                                         f"Invoice No: {p.get('project_code','')}\n\n"
                                         f"Please review at your convenience and let us know if you have any questions.\n"
                                         f"Thank you for your kind attention.")
@@ -490,7 +495,14 @@ def _show_invoice_preview(p):
     """Show a preview of invoice content inline."""
     client = get_client_by_id(p.get('client_id')) or {}
     cur = p.get('currency','USD')
-    amt = p.get('amount',0)
+    amt = invoice_amount(p)
+    total = p.get('amount', 0) or 0
+    it = p.get('installment_total', 1) or 1
+    ic = p.get('installment_current', 1) or 1
+    inst_row = ""
+    if it > 1:
+        inst_row = (f"<tr><td style='padding:3px 8px;color:#888'>期次</td>"
+                    f"<td>第{ic}次/共{it}次（合同总额 {cur} {total:,.2f}）</td></tr>")
 
     st.markdown(f"""
     <div style="border:1px solid #ddd;border-radius:8px;padding:12px;margin:8px 0;background:#fafafa">
@@ -499,7 +511,9 @@ def _show_invoice_preview(p):
     <tr><td style="padding:3px 8px;color:#888">项目</td><td>{p.get('project_name','')}</td></tr>
     <tr><td style="padding:3px 8px;color:#888">编号</td><td>{p.get('project_code','')}</td></tr>
     <tr><td style="padding:3px 8px;color:#888">客户</td><td>{client.get('full_name','')}</td></tr>
-    <tr><td style="padding:3px 8px;color:#888">金额</td><td><b>{cur} {amt:,.2f}</b></td></tr>
+    <tr><td style="padding:3px 8px;color:#888">发票类型</td><td>{p.get('content_type','') or '—'}</td></tr>
+    <tr><td style="padding:3px 8px;color:#888">本次开票金额</td><td><b>{cur} {amt:,.2f}</b></td></tr>
+    {inst_row}
     <tr><td style="padding:3px 8px;color:#888">到期日</td><td>{str(p.get('due_date',''))[:10]}</td></tr>
     </table>
     </div>
@@ -528,11 +542,12 @@ def _gen_invoice_dl(p):
         ws['C9']=client.get('contact',''); ws['C10']=client.get('phone') or ''
         ws['C11']=client.get('email') or ''
         ws['E8']=code; ws['E11']=code
-        ws['D15']=p.get('amount',0); ws['E15']=1; ws['G15']=p.get('amount',0)
+        inv_amt = invoice_amount(p)
+        ws['D15']=inv_amt; ws['E15']=1; ws['G15']=inv_amt
         ws['E9']=_fmt_date_val(datetime.now())
         ws['E10']=_fmt_date_val(p.get('due_date'))
         _set_c16(ws, p.get("content_type",""))
-        _write_c18(ws, p.get('amount',0), p.get('currency','USD'))
+        _write_c18(ws, inv_amt, p.get('currency','USD'))
         buf=io.BytesIO(); wb.save(buf); buf.seek(0)
         st.download_button("📥 下载Invoice", buf, file_name=f"{p.get('brand_name','')}-invoice.xlsx",
                           key=f"invdl_{p['id']}", use_container_width=True,
@@ -584,9 +599,10 @@ def _gen_stamped_only(p, output_path):
     ws['C9']=client.get('contact',''); ws['C10']=client.get('phone') or ''
     ws['C11']=client.get('email') or ''; ws['E8']=code
     ws['E9']=_fmt_date_val(datetime.now()); ws['E10']=_fmt_date_val(p.get('due_date'))
-    ws['E11']=code; ws['D15']=p.get('amount',0); ws['E15']=1; ws['G15']=p.get('amount',0)
+    inv_amt = invoice_amount(p)
+    ws['E11']=code; ws['D15']=inv_amt; ws['E15']=1; ws['G15']=inv_amt
     _set_c16(ws, p.get("content_type",""))
-    _write_c18(ws, p.get('amount',0), p.get('currency','USD'))
+    _write_c18(ws, inv_amt, p.get('currency','USD'))
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
     with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f: f.write(buf.read()); xlsx_path=f.name
     is_inf = client.get('short_name','') == 'Infinix'
@@ -620,10 +636,11 @@ def _regen_and_approve(p, user_id):
     ws['C11']=client.get('email') if client.get('email') and client['email']!='（待补充）' else None
     ws['E8']=code; ws['E9']=_fmt_date_val(datetime.now())
     ws['E10']=_fmt_date_val(p.get('due_date'))
-    ws['E11']=code; ws['D15']=p.get('amount',0)
-    ws['E15']=1; ws['G15']=p.get('amount',0)
+    inv_amt = invoice_amount(p)
+    ws['E11']=code; ws['D15']=inv_amt
+    ws['E15']=1; ws['G15']=inv_amt
     _set_c16(ws, p.get("content_type",""))
-    _write_c18(ws, p.get('amount',0), p.get('currency','USD'))
+    _write_c18(ws, inv_amt, p.get('currency','USD'))
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
     xlsx_path=tempfile.mktemp(suffix='.xlsx')
     with open(xlsx_path,'wb') as f: f.write(buf.read())

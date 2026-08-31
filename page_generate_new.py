@@ -221,6 +221,7 @@ def _show_info(edit_data, client_names, cmap, user):
         else:
             exec_period_auto = f"{_months[exec_start.month-1]} {exec_start.year} - {_months[exec_end.month-1]} {exec_end.year}"
         st.caption(f"执行周期：{exec_period_auto}")
+        st.session_state['ei_exec_period'] = exec_period_auto
         st.text_input("拍摄时间", value=edit_data.get('shooting_date',''), key="ei_shoot")
         st.text_input("总篇数", value=edit_data.get('total_posts',''), key="ei_posts",
                       placeholder="格式：150 photo posts")
@@ -430,23 +431,31 @@ def _act_submit(ed, user):
                 inst_amt = each_amt
             st.info(f"本次金额：**{ed.get('currency','USD')} {inst_amt:,.2f}** | 第{inst_cur}次/共{inst_total}次")
             default_amt = inst_amt
-            inv_type_default = f"服务款-第{inst_cur}次款项"
+            # 发票类型随期次联动：第1次=前款，最后一次=尾款，中间=中款
+            if inst_cur == 1:
+                inv_type_default = "服务款-前款"
+            elif inst_cur == inst_total:
+                inv_type_default = "服务款-后款"
+            else:
+                inv_type_default = "服务款-中款"
         else:
             inst_cur = 1
             inst_amt = total_contract
             default_amt = total_contract
             inv_type_default = "服务款-全款"
 
-        # 分期设置变化时，自动同步「本次开票金额」= 总额 ÷ 次数（手动改过则保留手动值）
+        # 分期设置变化时，自动同步「本次开票金额」与「发票类型」（手动改过则保留手动值）
         _prev_inst = st.session_state.get('_prev_inst')
         _cur_inst = (inst_total, inst_cur)
         if _prev_inst != _cur_inst:
             st.session_state['_prev_inst'] = _cur_inst
             st.session_state['inv_amt'] = default_amt
+            st.session_state['inv_type'] = inv_type_default
 
-        inv_type = st.selectbox("发票类型",
-                               ["服务款-全款","服务款-前款","服务款-中款","服务款-后款","样品费报销","差旅费报销"],
-                               index=0, key="inv_type")
+        _inv_types = ["服务款-全款","服务款-前款","服务款-中款","服务款-后款","样品费报销","差旅费报销"]
+        inv_type = st.selectbox("发票类型", _inv_types,
+                               index=_inv_types.index(inv_type_default) if inv_type_default in _inv_types else 0,
+                               key="inv_type")
         inv_amount = st.number_input("本次开票金额", value=default_amt if default_amt>0 else None,
                                      step=100.0, key="inv_amt",
                                      help=f"合同总额：{ed.get('currency','USD')} {total_contract:,.2f}（改动开票次数会自动重算）")
@@ -471,7 +480,7 @@ def _act_submit(ed, user):
         # Step 2: Submit
         st.success("✅ 信息已确认，请点击下方按钮提交")
         f_ok = st.checkbox("已在飞书立项", value=ed.get('feishu_approved',False))
-        inv_type = st.session_state.get('inv_type','服务款-前款')
+        inv_type = st.session_state.get('inv_type','服务款-全款')
         inv_amt = st.session_state.get('inv_amt',ed.get('amount',0))
         st.write(f"发票类型：**{inv_type}** | 金额：{ed.get('currency','USD')} {inv_amt:,.2f}")
 
@@ -485,9 +494,9 @@ def _act_submit(ed, user):
                 note = st.session_state.get('inv_note','')
                 it = st.session_state.get('_inst_total', 1) or 1
                 ic = st.session_state.get('_inst_cur', 1) or 1
+                # 注意：amount 保持合同总额不变；本次开票金额由 installment_total/current 推导（invoice_amount）
                 get_connection().table("projects").update({
                     "feishu_approved":f_ok, "status":"pending",
-                    "amount": float(inv_amt or ed.get('amount',0)),
                     "content_type": inv_type + (f" [{note}]" if note else ""),
                     "installment_total": it,
                     "installment_current": ic,

@@ -91,6 +91,19 @@ def _amount_chinese(amount: float, currency: str = "USD") -> str:
     return f"{cn}{unit}整"
 
 
+def invoice_amount(project: dict) -> float:
+    """本次开票金额：分期则取单次金额（平均分 + 末期补差额），全款则为总额。"""
+    total = float(project.get('amount', 0) or 0)
+    it = project.get('installment_total', 1) or 1
+    ic = project.get('installment_current', 1) or 1
+    if it > 1:
+        each = round(total / it, 2)
+        if ic == it:
+            return round(total - each * (it - 1), 2)
+        return each
+    return total
+
+
 def generate_confirmation_letter(client: dict, project: dict) -> str:
     """
     Generate confirmation letter .docx.
