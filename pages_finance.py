@@ -552,7 +552,7 @@ def _gen_invoice_dl(p):
         ws['E8']=code; ws['E11']=code
         inv_amt = invoice_amount(p)
         ws['D15']=inv_amt; ws['E15']=1; ws['G15']=inv_amt
-        ws['E9']=_fmt_date_val(datetime.now())
+        ws['E9']=_fmt_date_val(p.get('invoice_date'))
         ws['E10']=_fmt_date_val(p.get('due_date'))
         _set_c16(ws, p.get("content_type",""))
         _write_c18(ws, inv_amt, p.get('currency','USD'))
@@ -606,7 +606,7 @@ def _gen_stamped_only(p, output_path):
     ws['C7']=client.get('full_name',''); ws['C8']=client.get('address','')
     ws['C9']=client.get('contact',''); ws['C10']=client.get('phone') or ''
     ws['C11']=client.get('email') or ''; ws['E8']=code
-    ws['E9']=_fmt_date_val(datetime.now()); ws['E10']=_fmt_date_val(p.get('due_date'))
+    ws['E9']=_fmt_date_val(p.get('invoice_date')); ws['E10']=_fmt_date_val(p.get('due_date'))
     inv_amt = invoice_amount(p)
     ws['E11']=code; ws['D15']=inv_amt; ws['E15']=1; ws['G15']=inv_amt
     _set_c16(ws, p.get("content_type",""))
@@ -642,7 +642,7 @@ def _regen_and_approve(p, user_id):
     ws['C9']=client.get('contact','')
     ws['C10']=client.get('phone') if client.get('phone') and client['phone']!='（待补充）' else None
     ws['C11']=client.get('email') if client.get('email') and client['email']!='（待补充）' else None
-    ws['E8']=code; ws['E9']=_fmt_date_val(datetime.now())
+    ws['E8']=code; ws['E9']=_fmt_date_val(p.get('invoice_date'))
     ws['E10']=_fmt_date_val(p.get('due_date'))
     inv_amt = invoice_amount(p)
     ws['E11']=code; ws['D15']=inv_amt
