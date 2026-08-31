@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from utils.database import (get_projects, get_client_by_id, get_connection,
                             submit_for_approval, get_clients,
-                            get_all_users, save_project)
+                            get_all_users, save_project, duplicate_project)
 
 STAGES = {
     'draft': '📝 信息已填', 'confirmation_sent': '📨 确认函已发',
@@ -203,6 +203,16 @@ def page_workspace():
                 if st.button("📄 编辑项目", key=f"ws_op_{pid}", use_container_width=True):
                     st.session_state['edit_project_id'] = pid
                     st.session_state.page = "generate"; st.rerun()
+                # 复制项目（年框/周期项目快速新建，复制后改名称/金额/合作内容即可）
+                if st.button("📋 复制项目", key=f"ws_dup_{pid}", use_container_width=True):
+                    new_id = duplicate_project(pid, user['id'])
+                    if new_id:
+                        st.session_state['edit_project_id'] = new_id
+                        st.session_state.page = "generate"
+                        st.success("已复制为新项目，修改名称/金额/合作内容后保存")
+                        st.rerun()
+                    else:
+                        st.error("复制失败，请重试")
                 # 删除项目（仅本人或 admin，二次确认）
                 if user['id'] == p.get('created_by') or user['role'] == 'admin':
                     if st.session_state.get('ws_del_pid') == pid:

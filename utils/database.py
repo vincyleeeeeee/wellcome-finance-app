@@ -253,6 +253,40 @@ def get_project_by_id(project_id: int) -> Dict:
     return None
 
 
+def duplicate_project(project_id: int, user_id: int) -> int:
+    """复制项目为新的草稿，用于年框/周期性项目快速新建。
+    保留客户、品牌、币种、地点、平台、成本等不变字段；编号/状态等重置。"""
+    sb = _get_sb()
+    src = sb.table("projects").select("*").eq("id", project_id).execute()
+    if not src.data:
+        return 0
+    s = src.data[0]
+    data = {
+        "project_code": "",  # 开票时重新生成编号
+        "project_name": s.get("project_name", ""),
+        "client_id": s.get("client_id"),
+        "brand_name": s.get("brand_name", ""),
+        "amount": s.get("amount", 0) or 0,
+        "currency": s.get("currency", "USD"),
+        "venue": s.get("venue", ""),
+        "execution_period": s.get("execution_period", ""),
+        "shooting_date": s.get("shooting_date", ""),
+        "total_posts": s.get("total_posts", ""),
+        "invoice_date": datetime.now().strftime("%Y-%m-%d"),
+        "due_date": str(s.get("due_date", "") or "")[:10],
+        "content_type": s.get("content_type", "UGC铺量"),
+        "platform": s.get("platform", "小红书"),
+        "status": "draft",
+        "estimated_cost": s.get("estimated_cost", 0) or 0,
+        "cost_currency": s.get("cost_currency", "USD"),
+        "cost_breakdown": s.get("cost_breakdown", ""),
+        "created_by": user_id,
+        "owner_name": s.get("owner_name", ""),
+    }
+    result = sb.table("projects").insert(data).execute()
+    return result.data[0]["id"] if result.data else 0
+
+
 # ============================================================
 # Approval operations
 # ============================================================
