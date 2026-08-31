@@ -587,13 +587,17 @@ def _write_c18(ws, amount, currency):
 
 
 def _set_currency_headers(ws, currency):
-    """根据币种设置 D13/G13 单价/小计表头（模板默认美元，人民币项目须覆盖）。"""
+    """根据币种设置 D13/G13 表头 + D15/G15 货币符号格式（模板默认美元，人民币项目须覆盖）。"""
     if currency == 'RMB':
         ws['D13'] = '單價（人民幣）\nUNIT PRICE (RMB)'
         ws['G13'] = '小計（人民幣）\nAMOUNT (RMB)'
+        ws['D15'].number_format = '¥#,##0.00'
+        ws['G15'].number_format = '¥#,##0.00'
     else:
         ws['D13'] = '單價（美元）\nUNIT PRICE (USD)'
         ws['G13'] = '小計（美元）\nAMOUNT (USD)'
+        ws['D15'].number_format = '$#,##0.00'
+        ws['G15'].number_format = '$#,##0.00'
 
 
 def _gen_stamped_only(p, output_path):
