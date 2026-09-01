@@ -214,12 +214,8 @@ def _show_info(edit_data, client_names, cmap, user):
             exec_start = st.date_input("项目开始", value=exec_start_default, key=f"ei_start_{edit_data.get('id')}")
         with col_end:
             exec_end = st.date_input("项目结束", value=exec_end_default, key=f"ei_end_{edit_data.get('id')}")
-        # Auto-generate execution period（英文月份缩写，如 Aug - Dec 2026）
-        _months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-        if exec_start.year == exec_end.year:
-            exec_period_auto = f"{_months[exec_start.month-1]} - {_months[exec_end.month-1]} {exec_end.year}"
-        else:
-            exec_period_auto = f"{_months[exec_start.month-1]} {exec_start.year} - {_months[exec_end.month-1]} {exec_end.year}"
+        # Auto-generate execution period（数字格式保留具体日期，可精确回填，如 2026/8/13 - 2026/8/31）
+        exec_period_auto = f"{exec_start.year}/{exec_start.month}/{exec_start.day} - {exec_end.year}/{exec_end.month}/{exec_end.day}"
         st.caption(f"执行周期：{exec_period_auto}")
         st.session_state['ei_exec_period'] = exec_period_auto
         st.text_input("拍摄时间", value=edit_data.get('shooting_date',''), key="ei_shoot")
