@@ -1,6 +1,7 @@
 """Document generation: confirmation letter (docx) and invoice (xlsx)."""
 
 import os
+import re
 import datetime
 import tempfile
 from typing import Tuple
@@ -65,6 +66,27 @@ def _fmt_date(val):
     if isinstance(val, datetime.date):
         return val.strftime('%Y/%-m/%-d').replace('/0','/')
     return str(val)[:10]
+
+
+def format_exec_period(period):
+    """把执行周期转成英文月份显示（发票/确认函用）。
+    数字格式 '2026/8/13 - 2026/8/31' → 'Aug - Aug 2026'；跨年则 'Oct 2026 - Jan 2027'。
+    已是英文格式或其他格式则原样返回；空返回空。"""
+    if not period:
+        return ''
+    s = str(period).strip()
+    _mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    m = re.search(r'(\d{4})/(\d{1,2})/(\d{1,2})\s*[-–~到]\s*(\d{4})/(\d{1,2})/(\d{1,2})', s)
+    if m:
+        try:
+            y1, mo1 = int(m.group(1)), int(m.group(2))
+            y2, mo2 = int(m.group(4)), int(m.group(5))
+            if y1 == y2:
+                return f"{_mon[mo1 - 1]} - {_mon[mo2 - 1]} {y2}"
+            return f"{_mon[mo1 - 1]} {y1} - {_mon[mo2 - 1]} {y2}"
+        except (ValueError, IndexError):
+            pass
+    return s
 
 
 def _amount_chinese(amount: float, currency: str = "USD") -> str:
@@ -150,7 +172,7 @@ def generate_confirmation_letter(client: dict, project: dict) -> str:
     t1.rows[2].cells[1].paragraphs[0].runs[0].text = amount_str
     t1.rows[3].cells[1].paragraphs[0].runs[0].text = project['brand_name']
     t1.rows[4].cells[1].paragraphs[0].runs[0].text = project['venue']
-    t1.rows[5].cells[1].paragraphs[0].runs[0].text = project['execution_period']
+    t1.rows[5].cells[1].paragraphs[0].runs[0].text = format_exec_period(project.get('execution_period',''))
     t1.rows[6].cells[1].paragraphs[0].runs[0].text = project['shooting_date']
     t1.rows[7].cells[1].paragraphs[0].runs[0].text = project['total_posts']
 
@@ -193,7 +215,7 @@ def generate_invoice(client: dict, project: dict) -> str:
 
     # Header
     ws['C3'] = project.get('invoice_project_name', project['project_name'])
-    ws['C4'] = project['execution_period']
+    ws['C4'] = format_exec_period(project.get('execution_period',''))
     ws['C5'] = project['venue']
     ws['C7'] = client['full_name']
     ws['C8'] = client['address']
