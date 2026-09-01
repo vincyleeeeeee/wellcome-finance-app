@@ -3,6 +3,8 @@
 import os
 import hashlib
 import time
+import base64
+import json
 from datetime import datetime
 from typing import Optional, Tuple, List, Dict, Any
 
@@ -297,6 +299,47 @@ def duplicate_project(project_id: int, user_id: int) -> int:
     }
     result = sb.table("projects").insert(data).execute()
     return result.data[0]["id"] if result.data else 0
+
+
+# ============================================================
+# Confirmation file helpers (支持一个项目多份确认函)
+# ============================================================
+def parse_confirmation_files(raw) -> List[Dict]:
+    """把 stamped_confirmation 字段解析成文件列表。
+    兼容新格式（JSON 数组 [{'name','b64'}]）与旧格式（单个 base64 字符串）。
+    返回 [{'data': bytes, 'ext': '.png'|'.pdf', 'name': str}]。"""
+    files = []
+    raw = (raw or '').strip()
+    if not raw:
+        return files
+    if raw.startswith('['):
+        try:
+            items = json.loads(raw)
+            for i, it in enumerate(items):
+                if not isinstance(it, dict):
+                    continue
+                b64 = it.get('b64') or it.get('data') or ''
+                if not b64:
+                    continue
+                ext = '.png' if 'iVBOR' in b64[:20] else '.pdf'
+                files.append({'data': base64.b64decode(b64), 'ext': ext,
+                              'name': it.get('name') or f'确认函{i + 1}'})
+            return files
+        except (ValueError, TypeError):
+            pass
+    ext = '.png' if 'iVBOR' in raw[:20] else '.pdf'
+    files.append({'data': base64.b64decode(raw), 'ext': ext, 'name': '确认函'})
+    return files
+
+
+def encode_confirmation_files(files: List[Dict]) -> str:
+    """把文件列表编码为 JSON 数组（写入 stamped_confirmation）。
+    files 元素含 'data'(bytes) 或 'b64'(str)，以及可选 'name'。"""
+    arr = []
+    for f in files:
+        b64 = f.get('b64') or base64.b64encode(f['data']).decode()
+        arr.append({'name': f.get('name') or '确认函', 'b64': b64})
+    return json.dumps(arr, ensure_ascii=False)
 
 
 # ============================================================

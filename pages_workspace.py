@@ -133,16 +133,14 @@ def page_workspace():
                                               file_name=f"{p.get('brand_name','')}-confirmation-letter.docx",
                                               key=f"ws_cf_{pid}", use_container_width=True)
 
-                    # Stamped confirmation (if uploaded)
-                    if p.get('stamped_confirmation'):
-                        import base64
-                        # Detect file type from base64 header
-                        data = p['stamped_confirmation'][:20]
-                        ext = '.png' if 'iVBOR' in data else '.pdf'
-                        st.download_button("📎 盖章确认函",
-                                          base64.b64decode(p['stamped_confirmation']),
-                                          file_name=f"{p.get('brand_name','')}-盖章确认函{ext}",
-                                          key=f"ws_sc_{pid}", use_container_width=True)
+                    # Stamped confirmation (if uploaded) — 支持多份
+                    from utils.database import parse_confirmation_files
+                    _cfiles = parse_confirmation_files(p.get('stamped_confirmation'))
+                    for _ci, _cf in enumerate(_cfiles):
+                        _lbl = "📎 盖章确认函" + (f"{_ci+1}" if len(_cfiles) > 1 else "") + f"（{_cf['ext'][1:].upper()}）"
+                        st.download_button(_lbl, _cf['data'],
+                                          file_name=f"{p.get('brand_name','')}-盖章确认函{_ci+1}{_cf['ext']}",
+                                          key=f"ws_sc_{pid}_{_ci}", use_container_width=True)
 
                     # Stamped invoice - regenerate on demand
                     if p.get('status') == 'approved':

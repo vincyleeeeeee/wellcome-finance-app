@@ -368,16 +368,20 @@ def page_approval():
                         st.caption(f"预估成本: {p.get('estimated_cost',0):,.0f}"+(f"（{cd}）" if cd else ""))
                     st.caption(f"提交: {(p.get('created_at','') or '')[:10]}")
                 with col_btn:
-                    # Show stamped confirmation for download
-                    if p.get('stamped_confirmation'):
+                    # Show stamped confirmation for download — 支持多份
+                    from utils.database import parse_confirmation_files
+                    _cfiles = parse_confirmation_files(p.get('stamped_confirmation'))
+                    if _cfiles:
                         with st.expander("📎 盖章确认函"):
-                            import base64
-                            st.download_button("📥 下载盖章确认函",
-                                              base64.b64decode(p['stamped_confirmation']),
-                                              file_name=f"{p.get('brand_name','')}-盖章确认函.pdf",
-                                              mime="application/pdf")
-                            try: st.image(base64.b64decode(p['stamped_confirmation']))
-                            except: pass
+                            for _ci, _cf in enumerate(_cfiles):
+                                _lbl = "📥 下载盖章确认函" + (f"{_ci+1}" if len(_cfiles) > 1 else "") + f"（{_cf['ext'][1:].upper()}）"
+                                st.download_button(_lbl, _cf['data'],
+                                                  file_name=f"{p.get('brand_name','')}-盖章确认函{_ci+1}{_cf['ext']}",
+                                                  key=f"pc_sc_{p['id']}_{_ci}",
+                                                  mime="application/pdf" if _cf['ext'] == '.pdf' else "image/png")
+                                if _cf['ext'] == '.png':
+                                    try: st.image(_cf['data'])
+                                    except: pass
                     with st.expander("📄 预览Invoice", expanded=True):
                         _show_invoice_preview(p)
                     _gen_invoice_dl(p)

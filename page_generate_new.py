@@ -385,14 +385,24 @@ def _act_confirmation(ed, user):
 
 
 def _act_upload(ed, user):
-    st.write("📎 客户盖章后，上传确认函")
+    from utils.database import parse_confirmation_files, encode_confirmation_files
+    st.write("📎 客户盖章后，上传确认函（可多次上传，每次追加一份）")
+    existing = parse_confirmation_files(ed.get('stamped_confirmation'))
+    if existing:
+        st.success(f"已上传 {len(existing)} 份确认函")
+        for i, f in enumerate(existing):
+            st.download_button(f"📥 确认函{i+1}（{f['ext'][1:].upper()}）", f['data'],
+                               file_name=f"{ed.get('brand_name','')}-确认函{i+1}{f['ext']}",
+                               key=f"uu_dl_{ed['id']}_{i}")
     up = st.file_uploader("上传盖章确认函", type=["png","jpg","jpeg","pdf"], key=f"uu_{ed['id']}")
     if up:
         b64 = base64.b64encode(up.read()).decode()
-        get_connection().table("projects").update({"stamped_confirmation":b64,"status":"stamped_uploaded"}).eq("id",ed['id']).execute()
-        st.success("✅ 已上传！"); st.rerun()
-    if ed.get('stamped_confirmation'):
-        st.success("✅ 已上传")
+        existing.append({'b64': b64, 'name': up.name or '确认函'})
+        get_connection().table("projects").update({
+            "stamped_confirmation": encode_confirmation_files(existing),
+            "status": "stamped_uploaded",
+        }).eq("id", ed['id']).execute()
+        st.success(f"✅ 已追加「{up.name}」！"); st.rerun()
 
 
 def _act_submit(ed, user):
