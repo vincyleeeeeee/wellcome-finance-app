@@ -5,6 +5,8 @@ from datetime import datetime
 from PIL import Image as PILImage
 import openpyxl
 
+from utils.pdf_utils import jittered_anchor
+
 ISSUER = {
     "name": "Mr. Terry.Su", "phone": "008613609023860",
     "addr": "UNIT 1021, BEVERLEY COMMERCIAL CENTRE, 87-105 CHATHAN ROAD SOUTH, TSIM SHA TSUI, HK",
@@ -75,7 +77,8 @@ def generate_receipt_pdf(client: dict, receipt_data: dict, output_path: str = No
         stamp_img.width = 250
         stamp_img.height = int(250 * sh / sw)
         # Place on Name area: row 16-17, column D-F (right-center)
-        stamp_img.anchor = 'D16'
+        # 加随机偏移（±8%），避免每张收据盖章位置一模一样
+        stamp_img.anchor = jittered_anchor(stamp_img, 3, 15)  # D16 = col 3, row 15
         ws.add_image(stamp_img)
 
     # Save filled xlsx with stamp embedded

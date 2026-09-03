@@ -28,6 +28,23 @@ def xlsx_to_pdf(xlsx_path: str, output_dir: str = None) -> str:
     return pdf_path
 
 
+def jittered_anchor(img, col: int, row: int, x_pct: float = 0.08, y_pct: float = 0.08):
+    """在指定单元格锚点附近加随机偏移（默认 ±8%），让每张单据的盖章位置略有不同、更自然。
+    col/row 为 0-based（A=0、第 1 行=0）。返回 openpyxl 的 OneCellAnchor。"""
+    from openpyxl.drawing.spreadsheet_drawing import OneCellAnchor, AnchorMarker
+    from openpyxl.drawing.xdr import XDRPositiveSize2D
+    from openpyxl.utils.units import pixels_to_EMU
+    w = pixels_to_EMU(img.width)
+    h = pixels_to_EMU(img.height)
+    return OneCellAnchor(
+        _from=AnchorMarker(
+            col=col, colOff=random.randint(-int(w * x_pct), int(w * x_pct)),
+            row=row, rowOff=random.randint(-int(h * y_pct), int(h * y_pct)),
+        ),
+        ext=XDRPositiveSize2D(cx=w, cy=h),
+    )
+
+
 def generate_stamped_pdf(xlsx_path: str, output_path: str, stamp_path: str = None, add_signature: bool = False) -> str:
     """Embed stamp into xlsx, then convert to PDF via LibreOffice. Works on cloud."""
     # Find stamp
@@ -55,7 +72,8 @@ def generate_stamped_pdf(xlsx_path: str, output_path: str, stamp_path: str = Non
         img.width = 350
         img.height = int(350 * sh / sw)
         # Position OVER the Wellcome company name area (row 33)
-        img.anchor = 'D32'
+        # 加随机偏移（±8%），避免每张发票盖章位置一模一样
+        img.anchor = jittered_anchor(img, 3, 31)  # D32 = col 3, row 31
         ws.add_image(img)
 
     # Save modified xlsx
