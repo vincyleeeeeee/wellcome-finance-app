@@ -288,7 +288,7 @@ def _quick_create_form(user):
         with col1:
             sel = st.selectbox("客户简称 *", client_names, key="wqs_sel")
             st.text_input("项目编号", value="", key="wqs_code",
-                         placeholder="留空，开发票时自动生成")
+                         placeholder="留空，开发票时根据提示填写")
             from utils.database import generate_project_code
             st.caption(f"📝 今天开发票 → **{generate_project_code(datetime.now().strftime('%Y-%m-%d'))}**")
             st.text_input("项目名称 *", key="wqs_name")

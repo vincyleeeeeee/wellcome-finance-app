@@ -477,8 +477,8 @@ def _page_generate_placeholder():
             project_code = st.text_input("项目编号", value=edit_data['project_code'])
         else:
             project_code = st.text_input("项目编号", value="",
-                                        placeholder="留空，开发票时按当天日期自动分配",
-                                        help="可不填，审核通过开发票时会自动生成")
+                                        placeholder="留空，开发票时根据提示填写",
+                                        help="留空，开发票时根据提示填写编号")
             today_code = generate_project_code(datetime.now().strftime('%Y-%m-%d'))
             st.caption(f"📝 今天开发票的话，下一个可用编号：**{today_code}**（仅供参考）")
         project_name = st.text_input("项目名称 *", value=edit_data.get('project_name','') if edit_data else '',
