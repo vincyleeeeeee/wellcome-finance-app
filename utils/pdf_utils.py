@@ -13,6 +13,15 @@ def _find_soffice():
     return "soffice"
 
 
+def soffice_available() -> bool:
+    """检测 LibreOffice（soffice）是否可用。
+    不可用时（如 Streamlit Cloud 系统源过期装不上），盖章 PDF 降级为返回已盖章 xlsx。"""
+    for p in ["/opt/homebrew/bin/soffice", "soffice", "/usr/bin/soffice"]:
+        if shutil.which(p) or os.path.exists(p):
+            return True
+    return False
+
+
 def xlsx_to_pdf(xlsx_path: str, output_dir: str = None) -> str:
     """Convert xlsx to PDF using LibreOffice headless."""
     if output_dir is None:
@@ -84,6 +93,14 @@ def generate_stamped_pdf(xlsx_path: str, output_path: str, stamp_path: str = Non
     with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f:
         f.write(xlsx_buf.read())
         xlsx_stamped = f.name
+
+    # 无 LibreOffice 时降级：直接返回已盖章的 xlsx（印章已内嵌，跳过转 PDF）
+    if not soffice_available():
+        out_xlsx = os.path.splitext(output_path)[0] + '.xlsx'
+        shutil.copy(xlsx_stamped, out_xlsx)
+        try: os.unlink(xlsx_stamped)
+        except: pass
+        return out_xlsx
 
     # Convert to PDF
     try:

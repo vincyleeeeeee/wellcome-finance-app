@@ -402,14 +402,15 @@ def page_approval():
                                         f"Invoice No: {p.get('project_code','')}\n\n"
                                         f"Please review at your convenience and let us know if you have any questions.\n"
                                         f"Thank you for your kind attention.")
+                                _ja_path = _gen_stamped_only(p, tempfile.mktemp(suffix='.pdf'))
+                                _ja_ext = os.path.splitext(_ja_path)[1]
                                 st.session_state['just_approved'] = {
-                                    'name': f"{p.get('brand_name','')}-{m}-invoice.pdf",
-                                    'path': tempfile.mktemp(suffix='.pdf'),
+                                    'name': f"{p.get('brand_name','')}-{m}-invoice{_ja_ext}",
+                                    'path': _ja_path,
                                     'brand': p.get('brand_name',''),
                                     'code': p.get('project_code',''),
                                     'email_subj': subj, 'email_body': body,
                                 }
-                                _gen_stamped_only(p, st.session_state['just_approved']['path'])
                                 st.rerun()
                             except Exception as e: st.error(f"失败: {e}")
                     reject_reason = st.text_input("驳回原因", key=f"rej_reason_{p['id']}",
@@ -475,14 +476,14 @@ def page_approval():
                 st.write(f"**{name}**  |  {code}")
             with c2:
                 try:
-                    stamped_path = tempfile.mktemp(suffix='.pdf')
-                    _gen_stamped_only(p, stamped_path)
+                    stamped_path = _gen_stamped_only(p, tempfile.mktemp(suffix='.pdf'))
+                    ext = os.path.splitext(stamped_path)[1]
                     ms = code[8:10] if len(code)>=15 else ''
                     M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
                          '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
                     with open(stamped_path, 'rb') as f:
                         st.download_button("📥 下载", f,
-                                          file_name=f"{p.get('brand_name','')}-{M.get(ms,'')}-invoice.pdf",
+                                          file_name=f"{p.get('brand_name','')}-{M.get(ms,'')}-invoice{ext}",
                                           key=f"stamped6_{pid2}", use_container_width=True)
                 except: pass
             with c3:
@@ -636,9 +637,10 @@ def _gen_stamped_only(p, output_path):
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
     with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f: f.write(buf.read()); xlsx_path=f.name
     is_inf = client.get('short_name','') == 'Infinix'
-    generate_stamped_pdf(xlsx_path, output_path, add_signature=is_inf)
+    result = generate_stamped_pdf(xlsx_path, output_path, add_signature=is_inf)
     try: os.unlink(xlsx_path)
     except: pass
+    return result
 
 
 def _regen_and_approve(p, user_id):
@@ -677,7 +679,7 @@ def _regen_and_approve(p, user_id):
     with open(xlsx_path,'wb') as f: f.write(buf.read())
     stamped_path=tempfile.mktemp(suffix='.pdf')
     is_inf = client.get('short_name','') == 'Infinix'
-    generate_stamped_pdf(xlsx_path, stamped_path, add_signature=is_inf)
+    stamped_path = generate_stamped_pdf(xlsx_path, stamped_path, add_signature=is_inf)
     approve_project(p['id'], user_id, stamped_path)
     try: os.unlink(xlsx_path)
     except: pass

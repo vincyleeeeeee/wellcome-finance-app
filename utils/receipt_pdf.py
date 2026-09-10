@@ -5,7 +5,7 @@ from datetime import datetime
 from PIL import Image as PILImage
 import openpyxl
 
-from utils.pdf_utils import jittered_anchor
+from utils.pdf_utils import jittered_anchor, soffice_available
 
 ISSUER = {
     "name": "Mr. Terry.Su", "phone": "008613609023860",
@@ -89,6 +89,14 @@ def generate_receipt_pdf(client: dict, receipt_data: dict, output_path: str = No
     with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f:
         f.write(xlsx_buf.read())
         xlsx_path = f.name
+
+    # 无 LibreOffice 时降级：直接返回已盖章的 xlsx（印章已内嵌，跳过转 PDF）
+    if not soffice_available():
+        out_xlsx = os.path.splitext(output_path)[0] + '.xlsx'
+        shutil.copy(xlsx_path, out_xlsx)
+        try: os.unlink(xlsx_path)
+        except: pass
+        return out_xlsx
 
     # Convert to PDF via LibreOffice (stamp rendered natively, perfect quality)
     try:

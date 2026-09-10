@@ -789,20 +789,22 @@ def page_history():
                     # 实时重新生成（避免下载到审批时缓存于 stamped_pdf_path 的旧币种版本）
                     from pages_finance import _gen_stamped_only
                     import tempfile as _tf
-                    _tmp = _tf.mktemp(suffix='.pdf')
+                    _tmp = None
                     try:
-                        _gen_stamped_only(p, _tmp)
+                        _tmp = _gen_stamped_only(p, _tf.mktemp(suffix='.pdf'))
+                        _ext = os.path.splitext(_tmp)[1]
                         with open(_tmp, "rb") as f:
                             code_p = (p.get('project_code','') or '').strip()
                             ms = code_p[8:10] if len(code_p)>=15 else ''
                             M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
-                            fname = f"{p.get('brand_name','')}-{M.get(ms,'')}-invoice.pdf"
-                            st.download_button("📥 盖章PDF", f, file_name=fname,
+                            _lbl = "📥 盖章PDF" if _ext == '.pdf' else "📥 盖章发票(Excel)"
+                            fname = f"{p.get('brand_name','')}-{M.get(ms,'')}-invoice{_ext}"
+                            st.download_button(_lbl, f, file_name=fname,
                                              key=f"hist_stamped_{p['id']}", use_container_width=True)
                     except Exception:
                         pass
                     try:
-                        os.unlink(_tmp)
+                        if _tmp: os.unlink(_tmp)
                     except Exception:
                         pass
                     # Email template
@@ -900,23 +902,25 @@ def _regenerate_invoice_xlsx(client: dict, project: dict) -> bytes:
     return buf.read()
 
 
-def _regenerate_stamped_pdf_from_data(client: dict, project: dict) -> bytes:
-    """Generate stamped invoice PDF from data."""
+def _regenerate_stamped_pdf_from_data(client: dict, project: dict):
+    """Generate stamped invoice PDF (无 LibreOffice 时降级为已盖章 xlsx) from data. 返回 (bytes, 扩展名)。"""
     import io, tempfile
     xlsx_bytes = _regenerate_invoice_xlsx(client, project)
     with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f:
         f.write(xlsx_bytes)
         xlsx_path = f.name
-    pdf_path = tempfile.mktemp(suffix='.pdf')
+    out_path = None
     try:
         from utils.pdf_utils import generate_stamped_pdf
-        generate_stamped_pdf(xlsx_path, pdf_path)
-        with open(pdf_path, 'rb') as f:
-            return f.read()
+        out_path = generate_stamped_pdf(xlsx_path, tempfile.mktemp(suffix='.pdf'))
+        ext = os.path.splitext(out_path)[1]
+        with open(out_path, 'rb') as f:
+            return f.read(), ext
     finally:
         try: os.unlink(xlsx_path)
         except: pass
-        try: os.unlink(pdf_path)
+        try:
+            if out_path: os.unlink(out_path)
         except: pass
 
 
@@ -980,14 +984,14 @@ def page_finance():
                     else:
                         with st.spinner("正在生成盖章 PDF..."):
                             try:
-                                pdf_bytes = _regenerate_stamped_pdf_from_data(client, p)
+                                pdf_bytes, pdf_ext = _regenerate_stamped_pdf_from_data(client, p)
                                 # Save to temp and store path
                                 import tempfile
-                                stamped_path = tempfile.mktemp(suffix=".pdf", prefix=f"approved_{p['project_code']}_")
+                                stamped_path = tempfile.mktemp(suffix=pdf_ext, prefix=f"approved_{p['project_code']}_")
                                 with open(stamped_path, 'wb') as f:
                                     f.write(pdf_bytes)
                                 approve_project(p['id'], user['id'], stamped_path)
-                                fname = f"{p.get('brand_name','')}-{p.get('project_code','')}-stamped.pdf"
+                                fname = f"{p.get('brand_name','')}-{p.get('project_code','')}-stamped{pdf_ext}"
                                 st.session_state['just_approved'] = {
                                     'name': fname, 'path': stamped_path,
                                     'brand': p.get('brand_name',''),
@@ -1206,15 +1210,14 @@ def _receipt_form(client, project):
             except Exception:
                 st.session_state['receipt_xlsx'] = None
 
-            # 2) Generate stamped PDF
+            # 2) Generate stamped PDF (无 LibreOffice 时降级为已盖章 xlsx)
             try:
-                stamped_name = tempfile.mktemp(suffix=".pdf", prefix=f"receipt_{receipt_data['brand_name']}_")
-                generate_receipt_pdf(
+                stamped_name = generate_receipt_pdf(
                     {'full_name': client['full_name'], 'address': client.get('address', ''),
                      'contact': client.get('contact', ''), 'phone': client.get('phone', ''),
                      'email': client.get('email', '')},
                     receipt_data,
-                    stamped_name
+                    tempfile.mktemp(suffix=".pdf", prefix=f"receipt_{receipt_data['brand_name']}_")
                 )
                 st.success("✅ 收据已生成！")
                 # Save receipt path to database if we have a project
@@ -1235,9 +1238,11 @@ def _receipt_form(client, project):
         if os.path.exists(path):
             col_a, col_b = st.columns(2)
             with col_a:
+                _ext = os.path.splitext(path)[1]
                 with open(path, "rb") as f:
-                    fname = f"{st.session_state.get('receipt_brand','receipt')}-cash-receipt.pdf"
-                    st.download_button("📥 下载盖章收据 PDF", f, file_name=fname, use_container_width=True)
+                    fname = f"{st.session_state.get('receipt_brand','receipt')}-cash-receipt{_ext}"
+                    _lbl = "📥 下载盖章收据 PDF" if _ext == '.pdf' else "📥 下载盖章收据(Excel)"
+                    st.download_button(_lbl, f, file_name=fname, use_container_width=True)
             with col_b:
                 if st.session_state.get('receipt_xlsx'):
                     st.download_button("📥 下载收据 Excel", st.session_state['receipt_xlsx'],

@@ -146,15 +146,18 @@ def page_workspace():
                     if p.get('status') == 'approved':
                         from pages_finance import _gen_stamped_only
                         import tempfile, os as _os
-                        tmp = tempfile.mktemp(suffix='.pdf')
+                        inv_path = None
                         try:
-                            _gen_stamped_only(p, tmp)
-                            with open(tmp, 'rb') as f:
-                                st.download_button("📥 盖章Invoice", f,
-                                                  file_name=f"{p.get('brand_name','')}-{mn}-invoice.pdf",
+                            inv_path = _gen_stamped_only(p, tempfile.mktemp(suffix='.pdf'))
+                            inv_ext = _os.path.splitext(inv_path)[1]
+                            with open(inv_path, 'rb') as f:
+                                _lbl = "📥 盖章Invoice" if inv_ext == '.pdf' else "📥 盖章发票(Excel)"
+                                st.download_button(_lbl, f,
+                                                  file_name=f"{p.get('brand_name','')}-{mn}-invoice{inv_ext}",
                                                   key=f"ws_inv_{pid}", use_container_width=True)
                         except: pass
-                        try: _os.unlink(tmp)
+                        try:
+                            if inv_path: _os.unlink(inv_path)
                         except: pass
 
                     # Receipt (if any payment received)
@@ -170,19 +173,21 @@ def page_workspace():
                               'gained_date':datetime.now(),'payment_method':'BANK',
                               'issuer_name':'Mr. Terry.Su','project_date':p.get('execution_period',''),
                               'client_short':p.get('client_short','')}
-                        tmp2 = tempfile.mktemp(suffix='.pdf')
+                        rc_path = None
                         try:
-                            generate_receipt_pdf({'full_name':client2.get('full_name',''),
+                            rc_path = generate_receipt_pdf({'full_name':client2.get('full_name',''),
                                                 'address':client2.get('address',''),
                                                 'contact':client2.get('contact',''),
                                                 'phone':client2.get('phone',''),
-                                                'email':client2.get('email','')}, rd, tmp2)
-                            with open(tmp2, 'rb') as f:
+                                                'email':client2.get('email','')}, rd, tempfile.mktemp(suffix='.pdf'))
+                            rc_ext = _os2.path.splitext(rc_path)[1]
+                            with open(rc_path, 'rb') as f:
                                 st.download_button("🧾 盖章收据", f,
-                                                  file_name=f"{p.get('brand_name','')}-cash-receipt.pdf",
+                                                  file_name=f"{p.get('brand_name','')}-cash-receipt{rc_ext}",
                                                   key=f"ws_rc_{pid}", use_container_width=True)
                         except: pass
-                        try: _os2.unlink(tmp2)
+                        try:
+                            if rc_path: _os2.unlink(rc_path)
                         except: pass
 
                 # Email templates
