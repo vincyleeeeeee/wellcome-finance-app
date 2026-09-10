@@ -787,26 +787,28 @@ def page_history():
             with cc2:
                 if p.get('status') == 'approved':
                     # 实时重新生成（避免下载到审批时缓存于 stamped_pdf_path 的旧币种版本）
-                    from pages_finance import _gen_stamped_only
+                    from pages_finance import _gen_stamped_only, _render_period_downloads
                     import tempfile as _tf
-                    _tmp = None
-                    try:
-                        _tmp = _gen_stamped_only(p, _tf.mktemp(suffix='.pdf'))
-                        _ext = os.path.splitext(_tmp)[1]
-                        with open(_tmp, "rb") as f:
-                            code_p = (p.get('project_code','') or '').strip()
-                            ms = code_p[8:10] if len(code_p)>=15 else ''
-                            M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
-                            _lbl = "📥 盖章PDF" if _ext == '.pdf' else "📥 盖章发票(Excel)"
-                            fname = f"{p.get('brand_name','')}-{M.get(ms,'')}-invoice{_ext}"
-                            st.download_button(_lbl, f, file_name=fname,
-                                             key=f"hist_stamped_{p['id']}", use_container_width=True)
-                    except Exception:
-                        pass
-                    try:
-                        if _tmp: os.unlink(_tmp)
-                    except Exception:
-                        pass
+                    code_p = (p.get('project_code','') or '').strip()
+                    ms = code_p[8:10] if len(code_p)>=15 else ''
+                    M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
+                    mn = M.get(ms,'')
+                    if not _render_period_downloads(p, p['id'], "hist_stamped", mn):
+                        _tmp = None
+                        try:
+                            _tmp = _gen_stamped_only(p, _tf.mktemp(suffix='.pdf'))
+                            _ext = os.path.splitext(_tmp)[1]
+                            with open(_tmp, "rb") as f:
+                                _lbl = "📥 盖章PDF" if _ext == '.pdf' else "📥 盖章发票(Excel)"
+                                fname = f"{p.get('brand_name','')}-{mn}-invoice{_ext}"
+                                st.download_button(_lbl, f, file_name=fname,
+                                                 key=f"hist_stamped_{p['id']}", use_container_width=True)
+                        except Exception:
+                            pass
+                        try:
+                            if _tmp: os.unlink(_tmp)
+                        except Exception:
+                            pass
                     # Email template
                     with st.expander("📧 邮件文案", expanded=False):
                         code_p2 = (p.get('project_code','') or '').strip()

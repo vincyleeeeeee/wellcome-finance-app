@@ -475,17 +475,19 @@ def page_approval():
             with c1:
                 st.write(f"**{name}**  |  {code}")
             with c2:
-                try:
-                    stamped_path = _gen_stamped_only(p, tempfile.mktemp(suffix='.pdf'))
-                    ext = os.path.splitext(stamped_path)[1]
-                    ms = code[8:10] if len(code)>=15 else ''
-                    M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
-                         '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
-                    with open(stamped_path, 'rb') as f:
-                        st.download_button("📥 下载", f,
-                                          file_name=f"{p.get('brand_name','')}-{M.get(ms,'')}-invoice{ext}",
-                                          key=f"stamped6_{pid2}", use_container_width=True)
-                except: pass
+                ms = code[8:10] if len(code)>=15 else ''
+                M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
+                     '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
+                mn = M.get(ms,'')
+                if not _render_period_downloads(p, pid2, "stamped6", mn):
+                    try:
+                        stamped_path = _gen_stamped_only(p, tempfile.mktemp(suffix='.pdf'))
+                        ext = os.path.splitext(stamped_path)[1]
+                        with open(stamped_path, 'rb') as f:
+                            st.download_button("📥 下载", f,
+                                              file_name=f"{p.get('brand_name','')}-{mn}-invoice{ext}",
+                                              key=f"stamped6_{pid2}", use_container_width=True)
+                    except: pass
             with c3:
                 dl_key = f"dl_{pid2}"
                 if dl_key not in st.session_state: st.session_state[dl_key] = False
@@ -607,12 +609,31 @@ def _set_currency_headers(ws, currency):
         ws[cell].number_format = fmt
 
 
-def _gen_stamped_only(p, output_path):
-    """Generate stamped PDF without approving (for re-download)."""
+def _period_type(it: int, ic: int) -> str:
+    """分期时按第几期推导发票类型：第1期=前款、最后1期=后款、中间=中款；单期=全款。"""
+    if it <= 1:
+        return '服务款-全款'
+    if ic == 1:
+        return '服务款-前款'
+    if ic == it:
+        return '服务款-后款'
+    return '服务款-中款'
+
+
+def _gen_stamped_only(p, output_path, period=None):
+    """Generate stamped PDF without approving (for re-download).
+    period: 指定第几期（1-based）。分期项目传此参数可生成对应那期的发票（前款/中款/后款）。"""
     import openpyxl as xl
     from utils.pdf_utils import generate_stamped_pdf
     from utils.generate import TEMPLATE_DIR as TD
     from utils.database import generate_project_code, get_connection
+
+    # 指定期数时：用副本覆盖当前期与发票类型，金额/类型据此重算（不改数据库原记录）
+    if period:
+        p = dict(p)
+        _it = int(p.get('installment_total', 1) or 1)
+        p['installment_current'] = int(period)
+        p['content_type'] = _period_type(_it, int(period))
 
     # Safety: auto-assign code if somehow still empty
     code = (p.get('project_code','') or '').strip()
@@ -641,6 +662,40 @@ def _gen_stamped_only(p, output_path):
     try: os.unlink(xlsx_path)
     except: pass
     return result
+
+
+def _render_period_downloads(p, pid, key_prefix, month_str):
+    """分期项目：在下载区列出每一期（前款/中款/后款）的盖章发票下载按钮。
+    返回 True 表示已渲染分期按钮（调用方不再渲染单张）；返回 False 表示非分期。"""
+    it = int(p.get('installment_total', 1) or 1)
+    ic = int(p.get('installment_current', 1) or 1)
+    if it <= 1:
+        return False
+    for period in range(1, ic + 1):
+        if period == 1:
+            lbl = '前款'
+        elif period == it:
+            lbl = '后款'
+        else:
+            lbl = '中款'
+        path = None
+        try:
+            path = _gen_stamped_only(p, tempfile.mktemp(suffix='.pdf'), period=period)
+            ext = os.path.splitext(path)[1]
+            with open(path, 'rb') as f:
+                st.download_button(
+                    f"📥 盖章发票（{lbl}）",
+                    f,
+                    file_name=f"{p.get('brand_name','')}-{month_str}-invoice-{lbl}{ext}",
+                    key=f"{key_prefix}_{pid}_{period}",
+                    use_container_width=True)
+        except Exception:
+            pass
+        try:
+            if path: os.unlink(path)
+        except Exception:
+            pass
+    return True
 
 
 def _regen_and_approve(p, user_id):

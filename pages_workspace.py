@@ -144,21 +144,22 @@ def page_workspace():
 
                     # Stamped invoice - regenerate on demand
                     if p.get('status') == 'approved':
-                        from pages_finance import _gen_stamped_only
+                        from pages_finance import _gen_stamped_only, _render_period_downloads
                         import tempfile, os as _os
-                        inv_path = None
-                        try:
-                            inv_path = _gen_stamped_only(p, tempfile.mktemp(suffix='.pdf'))
-                            inv_ext = _os.path.splitext(inv_path)[1]
-                            with open(inv_path, 'rb') as f:
-                                _lbl = "📥 盖章Invoice" if inv_ext == '.pdf' else "📥 盖章发票(Excel)"
-                                st.download_button(_lbl, f,
-                                                  file_name=f"{p.get('brand_name','')}-{mn}-invoice{inv_ext}",
-                                                  key=f"ws_inv_{pid}", use_container_width=True)
-                        except: pass
-                        try:
-                            if inv_path: _os.unlink(inv_path)
-                        except: pass
+                        if not _render_period_downloads(p, pid, "ws_inv", mn):
+                            inv_path = None
+                            try:
+                                inv_path = _gen_stamped_only(p, tempfile.mktemp(suffix='.pdf'))
+                                inv_ext = _os.path.splitext(inv_path)[1]
+                                with open(inv_path, 'rb') as f:
+                                    _lbl = "📥 盖章Invoice" if inv_ext == '.pdf' else "📥 盖章发票(Excel)"
+                                    st.download_button(_lbl, f,
+                                                      file_name=f"{p.get('brand_name','')}-{mn}-invoice{inv_ext}",
+                                                      key=f"ws_inv_{pid}", use_container_width=True)
+                            except: pass
+                            try:
+                                if inv_path: _os.unlink(inv_path)
+                            except: pass
 
                     # Receipt (if any payment received)
                     if (p.get('received_amount', 0) or 0) > 0:
