@@ -586,6 +586,16 @@ def _set_c16(ws, content_type):
     ws['C16'] = f"{label}\nltem \"Service'"
 
 
+def _write_extra_note(ws, p):
+    """后款（最后一期）有产品费用时，在 C17 描述区追加英文备注（如 6支口红产品费用）。"""
+    it = int(p.get('installment_total', 1) or 1)
+    ic = int(p.get('installment_current', 1) or 1)
+    note = (p.get('extra_fee_note') or '').strip()
+    if note and ic == it:
+        cur = ws['C17'].value or ''
+        ws['C17'] = (cur + '\n' + note).strip() if cur else note
+
+
 def _write_c18(ws, amount, currency):
     """Write C18 with Chinese uppercase + English amount."""
     from utils.generate import _amount_chinese
@@ -654,6 +664,7 @@ def _gen_stamped_only(p, output_path, period=None):
     ws['E11']=code; ws['D15']=inv_amt; ws['E15']=1; ws['G15']=inv_amt
     _set_currency_headers(ws, p.get('currency','USD'))
     _set_c16(ws, p.get("content_type",""))
+    _write_extra_note(ws, p)
     _write_c18(ws, inv_amt, p.get('currency','USD'))
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
     with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as f: f.write(buf.read()); xlsx_path=f.name
@@ -728,6 +739,7 @@ def _regen_and_approve(p, user_id):
     ws['E15']=1; ws['G15']=inv_amt
     _set_currency_headers(ws, p.get('currency','USD'))
     _set_c16(ws, p.get("content_type",""))
+    _write_extra_note(ws, p)
     _write_c18(ws, inv_amt, p.get('currency','USD'))
     buf=io.BytesIO(); wb.save(buf); buf.seek(0)
     xlsx_path=tempfile.mktemp(suffix='.xlsx')

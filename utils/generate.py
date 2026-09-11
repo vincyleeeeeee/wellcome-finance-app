@@ -130,7 +130,8 @@ def _extra_fee_amount(project: dict) -> float:
 
 
 def invoice_amount(project: dict) -> float:
-    """本次开票金额：分期则取单次金额（平均分 + 末期补差额），全款则为总额；另有追加费用则折算并入。"""
+    """本次开票金额：分期则取单次金额（平均分 + 末期补差额），全款则为总额；
+    另有追加费用（产品费用等）只在最后一期（后款/尾款/全款）并入。"""
     total = float(project.get('amount', 0) or 0)
     it = project.get('installment_total', 1) or 1
     ic = project.get('installment_current', 1) or 1
@@ -139,7 +140,8 @@ def invoice_amount(project: dict) -> float:
         base = round(total - each * (it - 1), 2) if ic == it else each
     else:
         base = total
-    return round(base + _extra_fee_amount(project), 2)
+    extra = _extra_fee_amount(project) if ic == it else 0.0
+    return round(base + extra, 2)
 
 
 def generate_confirmation_letter(client: dict, project: dict) -> str:
