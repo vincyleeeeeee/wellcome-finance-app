@@ -345,10 +345,45 @@ def encode_confirmation_files(files: List[Dict]) -> str:
 # ============================================================
 # Approval operations
 # ============================================================
-def submit_for_approval(project_id: int) -> bool:
+def validate_project_basics(p: Dict) -> List[str]:
+    """生成确认函前必填校验，返回缺失项中文名列表（空=通过）。"""
+    errors = []
+    checks = [('client_id', '客户'), ('project_name', '项目名称'),
+              ('brand_name', '品牌名'), ('amount', '金额'),
+              ('venue', '执行地点'), ('execution_period', '执行周期'),
+              ('shooting_date', '拍摄时间'), ('total_posts', '总篇数'),
+              ('due_date', '到期日')]
+    for field, label in checks:
+        v = p.get(field)
+        if field == 'amount':
+            if not v or float(v or 0) <= 0:
+                errors.append(label)
+        elif not v or not str(v).strip():
+            errors.append(label)
+    return errors
+
+
+def validate_project_for_invoice(p: Dict) -> List[str]:
+    """提交发票前校验：基础信息 + 盖章确认函 + 成本。"""
+    errors = validate_project_basics(p)
+    if not (p.get('stamped_confirmation') or '').strip():
+        errors.append('盖章确认函')
+    if not p.get('estimated_cost') or float(p.get('estimated_cost', 0) or 0) <= 0:
+        errors.append('成本构成')
+    return errors
+
+
+def submit_for_approval(project_id: int):
+    """提交审核前校验，返回 (ok: bool, errors: List[str])。"""
     sb = _get_sb()
+    p = get_project_by_id(project_id)
+    if not p:
+        return False, ['项目不存在或已删除']
+    errors = validate_project_for_invoice(p)
+    if errors:
+        return False, errors
     sb.table("projects").update({"status": "pending"}).eq("id", project_id).execute()
-    return True
+    return True, []
 
 
 def approve_project(project_id: int, finance_user_id: int, pdf_path: str) -> bool:

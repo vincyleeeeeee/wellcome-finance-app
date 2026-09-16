@@ -739,10 +739,17 @@ def page_history():
         bc1, bc2, bc3 = st.columns(3)
         with bc1:
             if st.button("📤 批量提交审核", use_container_width=True):
+                failed = []
                 for pid in list(st.session_state['_selected_projects']):
-                    submit_for_approval(pid)
+                    ok, errs = submit_for_approval(pid)
+                    if not ok:
+                        failed.append((pid, errs))
                 st.session_state['_selected_projects'] = set()
-                st.success(f"已提交 {sel_count} 个项目")
+                if failed:
+                    for pid, errs in failed:
+                        st.error(f"项目#{pid} 无法提交：{'、'.join(errs)}")
+                else:
+                    st.success(f"已提交 {sel_count} 个项目")
                 st.rerun()
         with bc2:
             if st.button("🗑️ 批量删除", use_container_width=True):
@@ -821,9 +828,12 @@ def page_history():
                         st.text_area("正文", value=body, height=150, key=f"histbody_{p['id']}")
                 elif p.get('status') in ('draft', 'rejected') and user['id'] == p.get('created_by'):
                     if st.button("📤 提交审核", key=f"submit_hist_{p['id']}", use_container_width=True):
-                        submit_for_approval(p['id'])
-                        st.success(f"已提交: {p.get('project_code','')}")
-                        st.rerun()
+                        ok, errs = submit_for_approval(p['id'])
+                        if ok:
+                            st.success(f"已提交: {p.get('project_code','')}")
+                            st.rerun()
+                        else:
+                            st.error(f"无法提交：{'、'.join(errs)}")
 
             # Row 2: editable fields (visible to project owner or finance/admin)
             if user['id'] == p.get('created_by') or user['role'] in ('finance', 'admin'):

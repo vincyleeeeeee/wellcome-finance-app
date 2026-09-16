@@ -70,9 +70,18 @@ def page_workspace():
         c1,c2,c3 = st.columns(3)
         with c1:
             if st.button(f"📤 批量提交({len(sel)})", use_container_width=True):
+                failed = []
                 for pid in list(sel):
-                    submit_for_approval(pid)
-                sel.clear(); st.success("已提交"); st.rerun()
+                    ok, errs = submit_for_approval(pid)
+                    if not ok:
+                        failed.append((pid, errs))
+                sel.clear()
+                if failed:
+                    for pid, errs in failed:
+                        st.error(f"项目#{pid} 无法提交：{'、'.join(errs)}")
+                else:
+                    st.success("已提交")
+                st.rerun()
         with c2:
             if st.button(f"🗑️ 批量删除({len(sel)})", use_container_width=True):
                 for pid in list(sel):
@@ -238,7 +247,11 @@ def page_workspace():
                             st.rerun()
                 if p.get('status') in ('draft','rejected') and user['id'] == p.get('created_by'):
                     if st.button("📤 提交审核", key=f"ws_sub_{pid}", use_container_width=True):
-                        submit_for_approval(pid); st.success("已提交"); st.rerun()
+                        ok, errs = submit_for_approval(pid)
+                        if ok:
+                            st.success("已提交"); st.rerun()
+                        else:
+                            st.error(f"无法提交：{'、'.join(errs)}")
 
             # Editable status (owner or finance/admin)
             if user['id'] == p.get('created_by') or user['role'] in ('finance','admin'):

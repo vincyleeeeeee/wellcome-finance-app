@@ -5,7 +5,8 @@ from datetime import datetime
 import os, json, base64, re
 from utils.database import (get_clients, get_client_by_id, get_project_by_id,
                             save_project, get_all_users,
-                            get_connection)
+                            get_connection, validate_project_basics,
+                            validate_project_for_invoice)
 from utils.generate import (generate_confirmation_letter, generate_invoice,
                             generate_email_confirmation)
 
@@ -400,9 +401,18 @@ def _act_add_invoice(ed, user):
 def _act_confirmation(ed, user):
     st.write("📄 生成确认函，发给客户盖章")
 
+    def _check_basics():
+        errs = validate_project_basics(ed)
+        if errs:
+            st.error(f"❌ 请先补齐基础信息：{'、'.join(errs)}")
+            return False
+        return True
+
     col_gen, col_skip = st.columns(2)
     with col_gen:
         if st.button("📄 生成确认函", type="primary", use_container_width=True):
+            if not _check_basics():
+                return
             client = get_client_by_id(ed.get('client_id')) or {}
             proj = {'client_short':client.get('short_name',''),'project_code':ed.get('project_code',''),
                     'project_name':ed.get('project_name',''),'brand_name':ed.get('brand_name',''),
@@ -416,6 +426,8 @@ def _act_confirmation(ed, user):
     with col_skip:
         if st.button("⏭️ 跳过（客户自回传）", use_container_width=True,
                      help="POP等客户会自己回传确认函，无需我们生成"):
+            if not _check_basics():
+                return
             get_connection().table("projects").update({"status":"confirmation_sent"}).eq("id",ed['id']).execute()
             st.success("已跳过，直接进入上传确认函阶段。"); st.rerun()
 
@@ -444,11 +456,9 @@ def _act_upload(ed, user):
 def _act_submit(ed, user):
     st.write("🧾 确认信息，提交财务审核开发票")
 
-    errs = []
-    if not ed.get('stamped_confirmation'): errs.append("❌ 未上传盖章确认函")
-    if not ed.get('estimated_cost'): errs.append("❌ 成本构成为空")
+    errs = validate_project_for_invoice(ed)
     if errs:
-        for e in errs: st.error(e)
+        st.error(f"❌ 请补齐后再提交：{'、'.join(errs)}")
         return
 
     # Step 1: Review and confirm info
