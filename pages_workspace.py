@@ -144,7 +144,7 @@ def page_workspace():
 
                     # Stamped invoice - regenerate on demand
                     if p.get('status') == 'approved':
-                        from pages_finance import _gen_stamped_only, _render_period_downloads
+                        from pages_finance import _gen_stamped_only, _render_period_downloads, _render_add_download
                         import tempfile, os as _os
                         if not _render_period_downloads(p, pid, "ws_inv", mn):
                             inv_path = None
@@ -160,6 +160,7 @@ def page_workspace():
                             try:
                                 if inv_path: _os.unlink(inv_path)
                             except: pass
+                        _render_add_download(p, pid, "ws_inv", mn)
 
                     # Receipt (if any payment received)
                     if (p.get('received_amount', 0) or 0) > 0:

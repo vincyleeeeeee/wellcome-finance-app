@@ -64,6 +64,8 @@ def page_generate():
         st.divider()
 
         _stage_actions(edit_data, user)
+        st.divider()
+        _act_add_invoice(edit_data, user)
     else:
         st.info("从「📝 项目工作台」选择一个项目，或新建一个项目")
         # Quick create
@@ -359,6 +361,40 @@ def _stage_actions(edit_data, user):
     elif status == 'rejected':
         st.warning("已驳回，请修改信息后重新提交")
         _act_submit(edit_data, user)
+
+
+def _act_add_invoice(ed, user):
+    """追加合作金额 → 单独开追加款发票（沿用原项目号，走财务审批）。"""
+    cur = ed.get('currency','USD') or 'USD'
+    add_status = ed.get('add_status','') or ''
+    with st.expander("➕ 追加合作款发票（客户追加合作金额）",
+                     expanded=(add_status in ('pending','rejected'))):
+        st.caption(f"追加金额按项目币种（{cur}）计，沿用原项目号，单独一张发票走财务审批。")
+        col_a, col_b = st.columns([1, 2])
+        with col_a:
+            _amt = st.number_input("追加金额", min_value=0.0, step=0.01,
+                                   value=float(ed.get('add_amount',0) or 0), key="add_amt")
+        with col_b:
+            _note = st.text_input("追加说明（英文备注，写进发票）",
+                                  value=ed.get('add_note','') or '',
+                                  key="add_note_inp",
+                                  placeholder="如：Additional cooperation amount 1000 USD")
+        if add_status == 'pending':
+            st.info("⏳ 追加款已提交，等待财务审核通过...")
+        elif add_status == 'approved':
+            st.success(f"✅ 追加款已通过（{cur} {ed.get('add_amount',0):,.2f}），去下载区下载追加款发票。")
+        elif add_status == 'rejected':
+            st.warning("追加款被驳回，可修改后重新提交。")
+        if st.button("📤 提交追加款审核", type="primary", use_container_width=True):
+            if (_amt or 0) <= 0:
+                st.error("请填写追加金额")
+            else:
+                get_connection().table("projects").update({
+                    "add_amount": float(_amt),
+                    "add_note": _note,
+                    "add_status": "pending",
+                }).eq("id", ed['id']).execute()
+                st.success("✅ 追加款已提交！等待财务审核。"); st.rerun()
 
 
 def _act_confirmation(ed, user):

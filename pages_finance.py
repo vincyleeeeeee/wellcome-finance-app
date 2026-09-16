@@ -7,7 +7,7 @@ import os, io, json, tempfile
 
 from utils.database import (
     get_projects, get_clients, get_client_by_id, get_pending_approvals,
-    approve_project, reject_project
+    approve_project, reject_project, approve_add_project, reject_add_project
 )
 from utils.receipt_pdf import generate_receipt_pdf
 from utils.generate import generate_cash_receipt, invoice_amount, format_exec_period
@@ -424,6 +424,30 @@ def page_approval():
     else:
         st.success("✅ 没有需要审核的项目")
 
+    # === 追加款待审批（独立于主发票审批，add_status=='pending'）===
+    add_pending = [p for p in get_projects(limit=200) if p.get('add_status') == 'pending']
+    if add_pending:
+        st.divider()
+        st.subheader(f"➕ 追加款待审批（{len(add_pending)}个）")
+        for p in add_pending:
+            with st.container(border=True):
+                _add_amt = p.get('add_amount', 0) or 0
+                _add_note = p.get('add_note', '') or ''
+                c1, c2 = st.columns([3, 2])
+                with c1:
+                    st.write(f"**{p.get('brand_name','')}** — {p.get('project_code','') or '待分配'}")
+                    st.write(f"追加金额：{p.get('currency','USD')} **{_add_amt:,.2f}**")
+                    if _add_note:
+                        st.caption(f"说明：{_add_note}")
+                    st.caption(f"主发票状态：{STAGE_MAP.get(p.get('status',''), p.get('status',''))}")
+                with c2:
+                    if st.button("✅ 通过追加款", key=f"okadd_{p['id']}", use_container_width=True, type="primary"):
+                        _regen_add_and_approve(p, user['id'])
+                        st.success("追加款已通过！可在下方「已通过项目」下载。"); st.rerun()
+                    if st.button("❌ 驳回追加款", key=f"noadd_{p['id']}", use_container_width=True):
+                        reject_add_project(p['id'], user['id'])
+                        st.warning("已驳回"); st.rerun()
+
     # Show just-approved banner with download + email
     if 'just_approved' in st.session_state and st.session_state.get('just_approved'):
         ja = st.session_state['just_approved']
@@ -488,6 +512,7 @@ def page_approval():
                                               file_name=f"{p.get('brand_name','')}-{mn}-invoice{ext}",
                                               key=f"stamped6_{pid2}", use_container_width=True)
                     except: pass
+                _render_add_download(p, pid2, "stamped6", mn)
             with c3:
                 dl_key = f"dl_{pid2}"
                 if dl_key not in st.session_state: st.session_state[dl_key] = False
@@ -579,6 +604,7 @@ def _set_c16(ws, content_type):
     elif '中款' in ct: label = "項目【服务】中款"
     elif '后款' in ct or '尾款' in ct: label = "項目【服务】尾款"
     elif '全款' in ct: label = "項目【服务】全款"
+    elif '追加款' in ct: label = "項目【服务】追加款"
     elif '样品费' in ct: label = "項目【样品费】报销"
     elif '差旅费' in ct: label = "項目【差旅费】报销"
     elif '第' in ct and '次' in ct: label = "項目【服务】分期款"
@@ -706,6 +732,51 @@ def _render_period_downloads(p, pid, key_prefix, month_str):
             if path: os.unlink(path)
         except Exception:
             pass
+    return True
+
+
+def _gen_add_invoice(p, output_path):
+    """生成「追加款」盖章发票：沿用原项目号，金额=追加合作金额，备注=追加说明。
+    复用 _gen_stamped_only，靠构造副本字段（amount/add_note/content_type）带出正确内容。"""
+    add = dict(p)
+    add['amount'] = p.get('add_amount', 0) or 0
+    add['content_type'] = '服务款-追加款'
+    add['installment_total'] = 1
+    add['installment_current'] = 1
+    add['extra_fee'] = 0
+    add['extra_fee_note'] = p.get('add_note', '') or ''
+    return _gen_stamped_only(add, output_path)
+
+
+def _regen_add_and_approve(p, user_id):
+    """标记追加款通过（add_status='approved'）。下载时实时重新生成发票，不依赖缓存路径。"""
+    from utils.database import approve_add_project
+    approve_add_project(p['id'], user_id)
+
+
+def _render_add_download(p, pid, key_prefix, month_str):
+    """追加款发票（add_status=='approved'）下载按钮，实时重新生成。返回 True 表示已渲染。"""
+    if p.get('add_status') != 'approved':
+        return False
+    if not (p.get('add_amount', 0) or 0) > 0:
+        return False
+    path = None
+    try:
+        path = _gen_add_invoice(p, tempfile.mktemp(suffix='.pdf'))
+        ext = os.path.splitext(path)[1]
+        with open(path, 'rb') as f:
+            st.download_button(
+                f"📥 追加款发票（{p.get('currency','USD')} {p.get('add_amount',0):,.2f}）",
+                f,
+                file_name=f"{p.get('brand_name','')}-{month_str}-invoice-追加款{ext}",
+                key=f"{key_prefix}_{pid}_add",
+                use_container_width=True)
+    except Exception:
+        pass
+    try:
+        if path: os.unlink(path)
+    except Exception:
+        pass
     return True
 
 

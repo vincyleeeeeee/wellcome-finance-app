@@ -362,6 +362,20 @@ def approve_project(project_id: int, finance_user_id: int, pdf_path: str) -> boo
     return True
 
 
+def approve_add_project(project_id: int, finance_user_id: int) -> bool:
+    """通过追加款发票：只改 add_status，不动主发票 status（追加款是同一项目行的第二张发票）。"""
+    sb = _get_sb()
+    sb.table("projects").update({"add_status": "approved"}).eq("id", project_id).execute()
+    return True
+
+
+def reject_add_project(project_id: int, finance_user_id: int) -> bool:
+    """驳回追加款发票：add_status='rejected'，可重新提交。"""
+    sb = _get_sb()
+    sb.table("projects").update({"add_status": "rejected"}).eq("id", project_id).execute()
+    return True
+
+
 def reject_project(project_id: int, finance_user_id: int, reason: str = "") -> bool:
     sb = _get_sb()
     data = {

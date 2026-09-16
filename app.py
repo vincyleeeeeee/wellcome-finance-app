@@ -787,7 +787,7 @@ def page_history():
             with cc2:
                 if p.get('status') == 'approved':
                     # 实时重新生成（避免下载到审批时缓存于 stamped_pdf_path 的旧币种版本）
-                    from pages_finance import _gen_stamped_only, _render_period_downloads
+                    from pages_finance import _gen_stamped_only, _render_period_downloads, _render_add_download
                     import tempfile as _tf
                     code_p = (p.get('project_code','') or '').strip()
                     ms = code_p[8:10] if len(code_p)>=15 else ''
@@ -809,6 +809,7 @@ def page_history():
                             if _tmp: os.unlink(_tmp)
                         except Exception:
                             pass
+                    _render_add_download(p, p['id'], "hist_stamped", mn)
                     # Email template
                     with st.expander("📧 邮件文案", expanded=False):
                         code_p2 = (p.get('project_code','') or '').strip()
