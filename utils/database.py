@@ -499,6 +499,13 @@ def get_pending_approvals() -> List[Dict]:
     return data
 
 
+def get_pending_add_approvals() -> List[Dict]:
+    """待审批的追加款发票（add_status=='pending'），用于侧边栏「审核状态」角标计数。"""
+    sb = _get_sb()
+    result = sb.table("projects").select("*").eq("add_status", "pending").order("created_at").execute()
+    return result.data or []
+
+
 # ============================================================
 # Project code generation
 # ============================================================

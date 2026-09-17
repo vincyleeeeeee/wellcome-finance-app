@@ -15,6 +15,7 @@ from utils.database import (
     upsert_client, delete_client,
     save_project, get_projects, get_project_by_id,
     submit_for_approval, approve_project, reject_project, get_pending_approvals,
+    get_pending_add_approvals,
     set_user_role, generate_project_code
 )
 from utils.generate import (
@@ -190,7 +191,8 @@ def render_sidebar():
             st.divider()
             st.markdown("**💰 财务专区**")
             p = len(get_pending_approvals())
-            al = f"📋 审核状态" + (f" ({p})" if p else "")
+            ap = len(get_pending_add_approvals())
+            al = f"📋 审核状态" + (f" ({p + ap})" if (p + ap) else "")
             st.button("📊 项目总览", use_container_width=True,
                       type="primary" if cur == "overview" else "secondary",
                       on_click=_nav_to, args=("overview",))
