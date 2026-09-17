@@ -380,37 +380,59 @@ def _act_add_invoice(ed, user):
                                   value=ed.get('add_note','') or '',
                                   key="add_note_inp",
                                   placeholder="如：Additional cooperation amount 1000 USD")
-        # 追加成本明细（复用主成本分类，财务通过后并入主成本同名明细）
+        # 追加成本明细：按主项目成本分类罗列，勾选填金额，通过后并入同名明细
         st.divider()
-        st.caption("追加成本明细（按主成本分类填写，通过后自动并入同名明细）")
+        st.caption("追加成本明细（按主项目成本分类勾选填写，通过后自动并入同名明细）")
         _R = {"USD":7.2,"RMB":1.0,"THB":0.2,"MYR":1.55}
+        _CURS = ["RMB","USD","THB","MYR"]
         _add_items = []
+
+        # 解析主项目成本分类（去重、保留顺序与币种）
+        _main_cats = []
+        try:
+            _mb = json.loads(ed.get('cost_breakdown','') or '[]')
+            _seen = set()
+            for it in _mb:
+                if isinstance(it, dict) and it.get('name'):
+                    _nm = it['name']
+                    if _nm not in _seen:
+                        _seen.add(_nm)
+                        _main_cats.append((_nm, it.get('currency','RMB') or 'RMB'))
+        except: pass
+
         # 回填已提交的追加明细
         try:
             _exist_add = json.loads(ed.get('add_cost_breakdown','') or '[]')
             _add_map = {i['name']: i for i in _exist_add if isinstance(i, dict)}
-            for cat in ["拍摄","餐饮交通","兼职执行","发布","补发"]:
-                if cat in _add_map and f"addc_cb_{cat}" not in st.session_state:
-                    st.session_state[f"addc_cb_{cat}"] = True
-                    st.session_state[f"addc_a_{cat}"] = float(_add_map[cat].get('amount',0))
-                    st.session_state[f"addc_c_{cat}"] = _add_map[cat].get('currency','RMB')
+            for _idx, (_nm, _cu) in enumerate(_main_cats):
+                if _nm in _add_map and f"addc_cb_{_idx}" not in st.session_state:
+                    st.session_state[f"addc_cb_{_idx}"] = True
+                    st.session_state[f"addc_a_{_idx}"] = float(_add_map[_nm].get('amount',0))
+                    st.session_state[f"addc_c_{_idx}"] = _add_map[_nm].get('currency', _cu)
         except: pass
 
-        _addcols = st.columns(5)
-        for i, cat in enumerate(["拍摄","餐饮交通","兼职执行","发布","补发"]):
-            with _addcols[i]:
-                if st.checkbox(cat, value=st.session_state.get(f"addc_cb_{cat}", False), key=f"addc_cb_{cat}"):
-                    a = st.number_input("金额", key=f"addc_a_{cat}", step=100.0)
-                    cu = st.selectbox("币种", ["RMB","USD","THB","MYR"], key=f"addc_c_{cat}")
-                    if a and a > 0:
-                        _add_items.append({"name":cat,"amount":a,"currency":cu})
+        if _main_cats:
+            for _start in range(0, len(_main_cats), 5):
+                _row = _main_cats[_start:_start+5]
+                _cols = st.columns(len(_row))
+                for _ci, (_nm, _cu) in enumerate(_row):
+                    _idx = _start + _ci
+                    with _cols[_ci]:
+                        if st.checkbox(_nm, value=st.session_state.get(f"addc_cb_{_idx}", False), key=f"addc_cb_{_idx}"):
+                            a = st.number_input("金额", key=f"addc_a_{_idx}", step=100.0)
+                            _cix = _CURS.index(_cu) if _cu in _CURS else 0
+                            cu = st.selectbox("币种", _CURS, index=_cix, key=f"addc_c_{_idx}")
+                            if a and a > 0:
+                                _add_items.append({"name":_nm,"amount":a,"currency":cu})
+        else:
+            st.caption("（主项目还没有成本明细，先填主成本，或点下方「添加分类」手动加）")
 
         if 'addc_custom_n' not in st.session_state: st.session_state['addc_custom_n'] = 0
         for i in range(st.session_state['addc_custom_n']):
             c1,c2,c3 = st.columns([2,2,1])
             with c1: cn = st.text_input(f"分类#{i+1}", key=f"addc_cn{i}")
             with c2: ca = st.number_input("金额", key=f"addc_ca{i}", step=100.0)
-            with c3: cc = st.selectbox("币种",["RMB","USD","THB","MYR"], key=f"addc_cc{i}")
+            with c3: cc = st.selectbox("币种",_CURS, key=f"addc_cc{i}")
             if cn and ca and ca > 0:
                 _add_items.append({"name":cn,"amount":ca,"currency":cc})
         if st.button("➕ 添加分类", key="addc_add_cat"):
