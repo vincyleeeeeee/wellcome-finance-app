@@ -433,13 +433,28 @@ def page_approval():
             with st.container(border=True):
                 _add_amt = p.get('add_amount', 0) or 0
                 _add_note = p.get('add_note', '') or ''
-                _add_cost = p.get('add_cost', 0) or 0
+                _add_cd = p.get('add_cost_breakdown', '') or ''
+                _add_cost_txt = ''
+                _add_cost_total = 0.0
+                if _add_cd:
+                    try:
+                        _ac_items = json.loads(_add_cd)
+                        _R = {"USD":7.2,"RMB":1.0,"THB":0.2,"MYR":1.55}
+                        _parts = []
+                        for _ai in _ac_items:
+                            if not isinstance(_ai, dict):
+                                continue
+                            _parts.append(f"{_ai.get('name','')}({_ai.get('currency','RMB')}{_ai.get('amount',0):,.0f})")
+                            _add_cost_total += float(_ai.get('amount',0) or 0) * _R.get(_ai.get('currency','RMB') or 'RMB',1.0)
+                        _add_cost_txt = '、'.join(_parts)
+                    except (ValueError, TypeError):
+                        pass
                 c1, c2 = st.columns([3, 2])
                 with c1:
                     st.write(f"**{p.get('brand_name','')}** — {p.get('project_code','') or '待分配'}")
                     st.write(f"追加金额：{p.get('currency','USD')} **{_add_amt:,.2f}**")
-                    if _add_cost > 0:
-                        st.caption(f"追加成本：¥{_add_cost:,.0f}（通过后并入项目成本）")
+                    if _add_cost_txt:
+                        st.caption(f"追加成本：{_add_cost_txt}（≈¥{_add_cost_total:,.0f}，通过后并入同名明细）")
                     if _add_note:
                         st.caption(f"说明：{_add_note}")
                     st.caption(f"主发票状态：{STAGE_MAP.get(p.get('status',''), p.get('status',''))}")

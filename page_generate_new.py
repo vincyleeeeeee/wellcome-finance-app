@@ -380,9 +380,46 @@ def _act_add_invoice(ed, user):
                                   value=ed.get('add_note','') or '',
                                   key="add_note_inp",
                                   placeholder="如：Additional cooperation amount 1000 USD")
-        _cost = st.number_input("追加成本（RMB，内部核算用）", min_value=0.0, step=100.0,
-                                value=float(ed.get('add_cost',0) or 0), key="add_cost",
-                                help="追加这笔合作对应的成本，财务通过后自动并入项目成本")
+        # 追加成本明细（复用主成本分类，财务通过后并入主成本同名明细）
+        st.divider()
+        st.caption("追加成本明细（按主成本分类填写，通过后自动并入同名明细）")
+        _R = {"USD":7.2,"RMB":1.0,"THB":0.2,"MYR":1.55}
+        _add_items = []
+        # 回填已提交的追加明细
+        try:
+            _exist_add = json.loads(ed.get('add_cost_breakdown','') or '[]')
+            _add_map = {i['name']: i for i in _exist_add if isinstance(i, dict)}
+            for cat in ["拍摄","餐饮交通","兼职执行","发布","补发"]:
+                if cat in _add_map and f"addc_cb_{cat}" not in st.session_state:
+                    st.session_state[f"addc_cb_{cat}"] = True
+                    st.session_state[f"addc_a_{cat}"] = float(_add_map[cat].get('amount',0))
+                    st.session_state[f"addc_c_{cat}"] = _add_map[cat].get('currency','RMB')
+        except: pass
+
+        _addcols = st.columns(5)
+        for i, cat in enumerate(["拍摄","餐饮交通","兼职执行","发布","补发"]):
+            with _addcols[i]:
+                if st.checkbox(cat, value=st.session_state.get(f"addc_cb_{cat}", False), key=f"addc_cb_{cat}"):
+                    a = st.number_input("金额", key=f"addc_a_{cat}", step=100.0)
+                    cu = st.selectbox("币种", ["RMB","USD","THB","MYR"], key=f"addc_c_{cat}")
+                    if a and a > 0:
+                        _add_items.append({"name":cat,"amount":a,"currency":cu})
+
+        if 'addc_custom_n' not in st.session_state: st.session_state['addc_custom_n'] = 0
+        for i in range(st.session_state['addc_custom_n']):
+            c1,c2,c3 = st.columns([2,2,1])
+            with c1: cn = st.text_input(f"分类#{i+1}", key=f"addc_cn{i}")
+            with c2: ca = st.number_input("金额", key=f"addc_ca{i}", step=100.0)
+            with c3: cc = st.selectbox("币种",["RMB","USD","THB","MYR"], key=f"addc_cc{i}")
+            if cn and ca and ca > 0:
+                _add_items.append({"name":cn,"amount":ca,"currency":cc})
+        if st.button("➕ 添加分类", key="addc_add_cat"):
+            st.session_state['addc_custom_n'] += 1; st.rerun()
+
+        _add_total = sum(float(i.get('amount',0) or 0) * _R.get(i.get('currency','RMB') or 'RMB',1.0) for i in _add_items)
+        if _add_total > 0:
+            st.caption(f"追加成本合计(RMB): ¥{_add_total:,.0f}")
+
         if add_status == 'pending':
             st.info("⏳ 追加款已提交，等待财务审核通过...")
         elif add_status == 'approved':
@@ -396,7 +433,7 @@ def _act_add_invoice(ed, user):
                 get_connection().table("projects").update({
                     "add_amount": float(_amt),
                     "add_note": _note,
-                    "add_cost": float(_cost or 0),
+                    "add_cost_breakdown": json.dumps(_add_items, ensure_ascii=False) if _add_items else '',
                     "add_status": "pending",
                 }).eq("id", ed['id']).execute()
                 st.success("✅ 追加款已提交！等待财务审核。"); st.rerun()

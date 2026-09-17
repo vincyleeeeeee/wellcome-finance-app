@@ -399,42 +399,53 @@ def approve_project(project_id: int, finance_user_id: int, pdf_path: str) -> boo
 
 def approve_add_project(project_id: int, finance_user_id: int) -> bool:
     """通过追加款发票：只改 add_status，不动主发票 status（追加款是同一项目行的第二张发票）。
-    同时把追加成本（add_cost，RMB）并入主项目成本 estimated_cost / cost_breakdown。"""
+    同时把追加成本明细（add_cost_breakdown）并入主项目 cost_breakdown 同名明细，重算 estimated_cost。"""
     sb = _get_sb()
     p = get_project_by_id(project_id)
     updates = {"add_status": "approved"}
     if p:
-        add_cost = float(p.get('add_cost', 0) or 0)
-        if add_cost > 0:
-            items = []
+        add_items = []
+        raw_add = p.get('add_cost_breakdown') or ''
+        if raw_add:
+            try:
+                add_items = json.loads(raw_add)
+                if not isinstance(add_items, list):
+                    add_items = []
+            except (ValueError, TypeError):
+                add_items = []
+        if add_items:
+            main_items = []
             raw = p.get('cost_breakdown') or ''
             if raw:
                 try:
-                    items = json.loads(raw)
-                    if not isinstance(items, list):
-                        items = []
+                    main_items = json.loads(raw)
+                    if not isinstance(main_items, list):
+                        main_items = []
                 except (ValueError, TypeError):
-                    items = []
-            # 幂等：已有「追加款」明细则更新，否则新增，避免重复累加
-            hit = False
-            for it in items:
-                if isinstance(it, dict) and it.get('name') == '追加款':
-                    it['amount'] = add_cost
-                    it['currency'] = 'RMB'
-                    hit = True
-                    break
-            if not hit:
-                items.append({'name': '追加款', 'amount': add_cost, 'currency': 'RMB'})
-            # 重算 estimated_cost（RMB 总额，其他项按汇率折算）
+                    main_items = []
+            # 同名同币种直接累加，否则新增一条明细
+            for ai in add_items:
+                if not isinstance(ai, dict):
+                    continue
+                name = ai.get('name')
+                cur = ai.get('currency', 'RMB') or 'RMB'
+                amt = float(ai.get('amount', 0) or 0)
+                matched = False
+                for mi in main_items:
+                    if isinstance(mi, dict) and mi.get('name') == name and (mi.get('currency', 'RMB') or 'RMB') == cur:
+                        mi['amount'] = float(mi.get('amount', 0) or 0) + amt
+                        matched = True
+                        break
+                if not matched:
+                    main_items.append({'name': name, 'amount': amt, 'currency': cur})
+            # 重算 estimated_cost（RMB 总额，各明细按汇率折算）
             rates = {'USD': 7.2, 'RMB': 1.0, 'THB': 0.2, 'MYR': 1.55}
             total = 0.0
-            for it in items:
-                if not isinstance(it, dict):
+            for mi in main_items:
+                if not isinstance(mi, dict):
                     continue
-                amt = float(it.get('amount', 0) or 0)
-                cur = it.get('currency', 'RMB') or 'RMB'
-                total += amt * rates.get(cur, 1.0)
-            updates['cost_breakdown'] = json.dumps(items, ensure_ascii=False)
+                total += float(mi.get('amount', 0) or 0) * rates.get(mi.get('currency', 'RMB') or 'RMB', 1.0)
+            updates['cost_breakdown'] = json.dumps(main_items, ensure_ascii=False)
             updates['estimated_cost'] = round(total, 2)
     sb.table("projects").update(updates).eq("id", project_id).execute()
     return True
