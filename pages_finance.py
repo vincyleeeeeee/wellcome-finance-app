@@ -433,10 +433,13 @@ def page_approval():
             with st.container(border=True):
                 _add_amt = p.get('add_amount', 0) or 0
                 _add_note = p.get('add_note', '') or ''
+                _add_cost = p.get('add_cost', 0) or 0
                 c1, c2 = st.columns([3, 2])
                 with c1:
                     st.write(f"**{p.get('brand_name','')}** — {p.get('project_code','') or '待分配'}")
                     st.write(f"追加金额：{p.get('currency','USD')} **{_add_amt:,.2f}**")
+                    if _add_cost > 0:
+                        st.caption(f"追加成本：¥{_add_cost:,.0f}（通过后并入项目成本）")
                     if _add_note:
                         st.caption(f"说明：{_add_note}")
                     st.caption(f"主发票状态：{STAGE_MAP.get(p.get('status',''), p.get('status',''))}")

@@ -380,6 +380,9 @@ def _act_add_invoice(ed, user):
                                   value=ed.get('add_note','') or '',
                                   key="add_note_inp",
                                   placeholder="如：Additional cooperation amount 1000 USD")
+        _cost = st.number_input("追加成本（RMB，内部核算用）", min_value=0.0, step=100.0,
+                                value=float(ed.get('add_cost',0) or 0), key="add_cost",
+                                help="追加这笔合作对应的成本，财务通过后自动并入项目成本")
         if add_status == 'pending':
             st.info("⏳ 追加款已提交，等待财务审核通过...")
         elif add_status == 'approved':
@@ -393,6 +396,7 @@ def _act_add_invoice(ed, user):
                 get_connection().table("projects").update({
                     "add_amount": float(_amt),
                     "add_note": _note,
+                    "add_cost": float(_cost or 0),
                     "add_status": "pending",
                 }).eq("id", ed['id']).execute()
                 st.success("✅ 追加款已提交！等待财务审核。"); st.rerun()
