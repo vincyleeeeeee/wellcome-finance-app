@@ -114,7 +114,10 @@ def page_workspace():
             with cc1:
                 code_display = p.get('project_code','') or '（待分配编号）'
                 st.write(f"{stage}{paid} **{p.get('brand_name','')}** — {code_display}")
-                st.caption(f"{p.get('currency','USD')} {p.get('amount',0):,.2f} | {p.get('client_short','')} | 👤 {p.get('owner_name','') or '未指定'} | {closure} | {(p.get('created_at','') or '')[:10]}")
+                _add_amt = float(p.get('add_amount', 0) or 0)
+                _amt_show = float(p.get('amount', 0) or 0) + _add_amt
+                _amt_str = f"{p.get('currency','USD')} {_amt_show:,.2f}" + (f"（含追加 {_add_amt:,.2f}）" if _add_amt > 0 else "")
+                st.caption(f"{_amt_str} | {p.get('client_short','')} | 👤 {p.get('owner_name','') or '未指定'} | {closure} | {(p.get('created_at','') or '')[:10]}")
             with cc2:
                 # Download buttons based on stage
                 code_p = p.get('project_code','')

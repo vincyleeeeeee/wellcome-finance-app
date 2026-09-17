@@ -785,7 +785,10 @@ def page_history():
                     st.session_state['_selected_projects'].discard(pid)
             with cc1:
                 st.write(f"{status_label} {closure_label} **{p.get('brand_name','?')}** — {p.get('project_code','?')}")
-                info_parts = [f"金额: {p.get('currency','USD')} {p.get('amount',0):,.2f}"]
+                _add_amt_h = float(p.get('add_amount', 0) or 0)
+                _amt_show_h = float(p.get('amount', 0) or 0) + _add_amt_h
+                _amt_str_h = f"金额: {p.get('currency','USD')} {_amt_show_h:,.2f}" + (f"（含追加 {_add_amt_h:,.2f}）" if _add_amt_h > 0 else "")
+                info_parts = [_amt_str_h]
                 if p.get('estimated_cost'):
                     info_parts.append(f"成本: {p.get('cost_currency','USD')} {p.get('estimated_cost',0):,.0f}")
                 info_parts.append(f"提交: {p.get('created_at','')[:10]}")
