@@ -88,7 +88,7 @@ def page_overview():
     received_partial = sum(1 for p in projects if not p.get('payment_received') and (p.get('received_amount', 0) or 0) > 0)
     closed_count = sum(1 for p in projects if p.get('closure_status') == 'closed')
     total_cost = sum(p.get('estimated_cost',0) or 0 for p in projects)
-    total_revenue = sum(p.get('amount',0) or 0 for p in projects)
+    total_revenue = sum((p.get('amount',0) or 0) + (p.get('add_amount',0) or 0) for p in projects)
     total_received = sum((p.get('received_amount', 0) or 0) for p in projects)
     need_receipt = sum(1 for p in projects if (p.get('received_amount', 0) or 0) > 0 and p.get('status')=='approved')
     c1,c2,c3,c4,c5,c6,c7,c8 = st.columns(8)

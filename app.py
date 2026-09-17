@@ -1317,10 +1317,12 @@ def page_cost():
     st.dataframe(df, use_container_width=True, hide_index=True)
 
     # Summary
-    total_revenue = sum(p.get('amount',0) or 0 for p in all_projects)
+    total_revenue = sum((p.get('amount',0) or 0) + (p.get('add_amount',0) or 0) for p in all_projects)
     total_cost = sum(p.get('estimated_cost',0) or 0 for p in all_projects)
     approved = [p for p in all_projects if p.get('status')=='approved']
-    approved_rev = sum(p.get('amount',0) or 0 for p in approved)
+    # 已通过收入 = 主发票已通过项目的 amount + 追加款已通过（add_status=='approved'）的 add_amount
+    approved_rev = sum((p.get('amount',0) or 0) for p in approved) \
+                 + sum((p.get('add_amount',0) or 0) for p in all_projects if p.get('add_status')=='approved')
     approved_cost = sum(p.get('estimated_cost',0) or 0 for p in approved)
 
     col1, col2, col3, col4 = st.columns(4)
