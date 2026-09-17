@@ -12,7 +12,7 @@ from utils.database import (
 from utils.receipt_pdf import generate_receipt_pdf
 from utils.generate import generate_cash_receipt, invoice_amount, format_exec_period
 
-STAGE_MAP = {'draft': '草稿', 'pending': '待审核', 'approved': '已开发票', 'rejected': '已驳回'}
+STAGE_MAP = {'draft': '草稿', 'confirmation_sent': '确认函已发', 'stamped_uploaded': '已上传盖章', 'pending': '待审核', 'approved': '已开发票', 'rejected': '已驳回'}
 CLOSURE_MAP = {'active': '进行中', 'pending_payment': '待收款', 'closed': '已结案'}
 # 成本细项固定顺序：拍摄 → 餐饮交通 → 兼职执行 → 发布 → 补发
 COST_ORDER = {'拍摄': 1, '餐饮交通': 2, '兼职执行': 3, '发布': 4, '补发': 5}
@@ -540,6 +540,24 @@ def page_approval():
     else:
         st.info("暂无已通过的项目")
 
+    # === 追加款已通过（主发票未开）—— 提供追加款发票下载 ===
+    add_approved_extra = [p for p in all_p if p.get('add_status') == 'approved' and p.get('status') != 'approved']
+    if add_approved_extra:
+        st.divider()
+        st.subheader(f"🧾 追加款已通过（主发票未开，{len(add_approved_extra)}个）")
+        _M2 = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
+               '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
+        for p in add_approved_extra:
+            _c1, _c2 = st.columns([5, 2])
+            with _c1:
+                st.write(f"**{p.get('brand_name','')}** — {p.get('project_code','') or '待分配'}")
+                st.caption(f"追加金额：{p.get('currency','USD')} {p.get('add_amount',0):,.2f} | 主发票状态：{STAGE_MAP.get(p.get('status',''), p.get('status',''))}")
+            with _c2:
+                _code = (p.get('project_code','') or '').strip()
+                _ms = _code[8:10] if len(_code) >= 15 else ''
+                _mn = _M2.get(_ms, '')
+                _render_add_download(p, p['id'], "stamped6", _mn)
+
 
 def _show_invoice_preview(p):
     """Show a preview of invoice content inline."""
@@ -719,14 +737,18 @@ def _gen_stamped_only(p, output_path, period=None):
     return result
 
 
-def _render_period_downloads(p, pid, key_prefix, month_str):
+def _render_period_downloads(p, pid, key_prefix, month_str, max_period=None):
     """分期项目：在下载区列出每一期（前款/中款/后款）的盖章发票下载按钮。
-    返回 True 表示已渲染分期按钮（调用方不再渲染单张）；返回 False 表示非分期。"""
+    max_period: 只显示到第几期（默认显示到当前期 ic）。用于「开下一期」时只列出已开的期次。
+    返回 True 表示已渲染分期按钮（调用方不再渲染单张）；返回 False 表示非分期或无需渲染。"""
     it = int(p.get('installment_total', 1) or 1)
     ic = int(p.get('installment_current', 1) or 1)
     if it <= 1:
         return False
-    for period in range(1, ic + 1):
+    end = max_period if max_period is not None else ic
+    if end < 1:
+        return False
+    for period in range(1, end + 1):
         if period == 1:
             lbl = '前款'
         elif period == it:

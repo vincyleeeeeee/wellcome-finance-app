@@ -152,9 +152,11 @@ def page_workspace():
                                           key=f"ws_sc_{pid}_{_ci}", use_container_width=True)
 
                     # Stamped invoice - regenerate on demand
+                    from pages_finance import _gen_stamped_only, _render_period_downloads, _render_add_download
+                    import tempfile, os as _os
+                    _it = int(p.get('installment_total', 1) or 1)
+                    _ic = int(p.get('installment_current', 1) or 1)
                     if p.get('status') == 'approved':
-                        from pages_finance import _gen_stamped_only, _render_period_downloads, _render_add_download
-                        import tempfile, os as _os
                         if not _render_period_downloads(p, pid, "ws_inv", mn):
                             inv_path = None
                             try:
@@ -169,7 +171,11 @@ def page_workspace():
                             try:
                                 if inv_path: _os.unlink(inv_path)
                             except: pass
-                        _render_add_download(p, pid, "ws_inv", mn)
+                    elif p.get('status') in ('stamped_uploaded','pending') and _it > 1 and _ic > 1:
+                        # 分期项目已开前面期次（当前期 _ic 为待开）
+                        _render_period_downloads(p, pid, "ws_inv", mn, max_period=_ic - 1)
+                    # 追加款发票（财务已通过）独立于主发票状态显示
+                    _render_add_download(p, pid, "ws_inv", mn)
 
                     # Receipt (if any payment received)
                     if (p.get('received_amount', 0) or 0) > 0:

@@ -794,14 +794,17 @@ def page_history():
                 st.caption(" | ".join(info_parts))
 
             with cc2:
+                # 发票下载：已开发票显示全部期次；分期已开前面期次 / 追加款已通过也显示
+                from pages_finance import _gen_stamped_only, _render_period_downloads, _render_add_download
+                import tempfile as _tf
+                code_p = (p.get('project_code','') or '').strip()
+                ms = code_p[8:10] if len(code_p)>=15 else ''
+                M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
+                mn = M.get(ms,'')
+                _it = int(p.get('installment_total', 1) or 1)
+                _ic = int(p.get('installment_current', 1) or 1)
                 if p.get('status') == 'approved':
                     # 实时重新生成（避免下载到审批时缓存于 stamped_pdf_path 的旧币种版本）
-                    from pages_finance import _gen_stamped_only, _render_period_downloads, _render_add_download
-                    import tempfile as _tf
-                    code_p = (p.get('project_code','') or '').strip()
-                    ms = code_p[8:10] if len(code_p)>=15 else ''
-                    M = {'01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun','07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec'}
-                    mn = M.get(ms,'')
                     if not _render_period_downloads(p, p['id'], "hist_stamped", mn):
                         _tmp = None
                         try:
@@ -818,8 +821,13 @@ def page_history():
                             if _tmp: os.unlink(_tmp)
                         except Exception:
                             pass
-                    _render_add_download(p, p['id'], "hist_stamped", mn)
-                    # Email template
+                elif p.get('status') in ('stamped_uploaded','pending') and _it > 1 and _ic > 1:
+                    # 分期项目已开前面期次（当前期 _ic 为待开）
+                    _render_period_downloads(p, p['id'], "hist_stamped", mn, max_period=_ic - 1)
+                # 追加款发票（财务已通过）独立于主发票状态显示
+                _render_add_download(p, p['id'], "hist_stamped", mn)
+                # Email template（仅已开发票）
+                if p.get('status') == 'approved':
                     with st.expander("📧 邮件文案", expanded=False):
                         code_p2 = (p.get('project_code','') or '').strip()
                         ms2 = code_p2[8:10] if len(code_p2)>=15 else ''
