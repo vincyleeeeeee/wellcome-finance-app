@@ -373,8 +373,14 @@ def _act_add_invoice(ed, user):
         st.caption(f"追加金额按项目币种（{cur}）计，沿用原项目号，单独一张发票走财务审批。")
         col_a, col_b = st.columns([1, 2])
         with col_a:
-            _amt = st.number_input("追加金额", min_value=0.0, step=0.01,
+            _amt = st.number_input("追加金额（本次预付款）", min_value=0.0, step=0.01,
                                    value=float(ed.get('add_amount',0) or 0), key="add_amt")
+            _ratio_pct = st.number_input("预付款比例(%)", min_value=1, max_value=100,
+                                         value=int(float(ed.get('add_ratio',0.5) or 0.5) * 100),
+                                         step=5, key="add_ratio_pct")
+            if (_amt or 0) > 0:
+                _full = (_amt or 0) / (_ratio_pct / 100.0)
+                st.caption(f"追加全额 ≈ {cur} {_full:,.2f}")
         with col_b:
             _note = st.text_input("追加说明（英文备注，写进发票）",
                                   value=ed.get('add_note','') or '',
@@ -454,6 +460,7 @@ def _act_add_invoice(ed, user):
             else:
                 get_connection().table("projects").update({
                     "add_amount": float(_amt),
+                    "add_ratio": (_ratio_pct or 50) / 100.0,
                     "add_note": _note,
                     "add_cost_breakdown": json.dumps(_add_items, ensure_ascii=False) if _add_items else '',
                     "add_status": "pending",

@@ -16,7 +16,7 @@ from utils.database import (
     save_project, get_projects, get_project_by_id,
     submit_for_approval, approve_project, reject_project, get_pending_approvals,
     get_pending_add_approvals,
-    set_user_role, generate_project_code
+    set_user_role, generate_project_code, add_total
 )
 from utils.generate import (
     generate_confirmation_letter, generate_invoice,
@@ -785,7 +785,7 @@ def page_history():
                     st.session_state['_selected_projects'].discard(pid)
             with cc1:
                 st.write(f"{status_label} {closure_label} **{p.get('brand_name','?')}** — {p.get('project_code','?')}")
-                _add_amt_h = float(p.get('add_amount', 0) or 0)
+                _add_amt_h = add_total(p)
                 _amt_show_h = float(p.get('amount', 0) or 0) + _add_amt_h
                 _amt_str_h = f"金额: {p.get('currency','USD')} {_amt_show_h:,.2f}" + (f"（含追加 {_add_amt_h:,.2f}）" if _add_amt_h > 0 else "")
                 info_parts = [_amt_str_h]
@@ -1061,7 +1061,7 @@ def page_finance():
                 '项目编号': p.get('project_code',''),
                 '品牌': p.get('brand_name',''),
                 '客户': p.get('client_short',''),
-                '项目金额': f"{p.get('currency','USD')} {p.get('amount',0):,.0f}",
+                '项目金额': f"{p.get('currency','USD')} {(p.get('amount',0) or 0) + add_total(p):,.0f}",
                 '预估成本': f"{p.get('cost_currency','USD')} {p.get('estimated_cost',0):,.0f}",
                 '成本构成': (p.get('cost_breakdown','') or '')[:60],
                 '提交时间': (p.get('created_at','') or '')[:10],
@@ -1304,7 +1304,7 @@ def page_cost():
             '品牌': p.get('brand_name',''),
             '客户': p.get('client_short',''),
             '状态': {'draft':'草稿','pending':'待审','approved':'通过','rejected':'驳回'}.get(p.get('status',''), p.get('status','')),
-            '项目金额': f"{p.get('currency','USD')} {p.get('amount',0):,.0f}",
+            '项目金额': f"{p.get('currency','USD')} {(p.get('amount',0) or 0) + add_total(p):,.0f}",
             '预估成本': f"{p.get('cost_currency','USD')} {p.get('estimated_cost',0):,.0f}",
             '预计到账': str(p.get('expected_payment_date',''))[:10] if p.get('expected_payment_date') else '-',
             '成本构成': (p.get('cost_breakdown','') or '')[:80],
@@ -1317,12 +1317,12 @@ def page_cost():
     st.dataframe(df, use_container_width=True, hide_index=True)
 
     # Summary
-    total_revenue = sum((p.get('amount',0) or 0) + (p.get('add_amount',0) or 0) for p in all_projects)
+    total_revenue = sum((p.get('amount',0) or 0) + add_total(p) for p in all_projects)
     total_cost = sum(p.get('estimated_cost',0) or 0 for p in all_projects)
     approved = [p for p in all_projects if p.get('status')=='approved']
-    # 已通过收入 = 主发票已通过项目的 amount + 追加款已通过（add_status=='approved'）的 add_amount
+    # 已通过收入 = 主发票已通过项目的 amount + 追加款已通过（add_status=='approved'）的追加全额
     approved_rev = sum((p.get('amount',0) or 0) for p in approved) \
-                 + sum((p.get('add_amount',0) or 0) for p in all_projects if p.get('add_status')=='approved')
+                 + sum(add_total(p) for p in all_projects if p.get('add_status')=='approved')
     approved_cost = sum(p.get('estimated_cost',0) or 0 for p in approved)
 
     col1, col2, col3, col4 = st.columns(4)

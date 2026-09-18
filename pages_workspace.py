@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from utils.database import (get_projects, get_client_by_id, get_connection,
                             submit_for_approval, get_clients,
-                            get_all_users, save_project, duplicate_project)
+                            get_all_users, save_project, duplicate_project, add_total)
 
 STAGES = {
     'draft': '📝 信息已填', 'confirmation_sent': '📨 确认函已发',
@@ -114,7 +114,7 @@ def page_workspace():
             with cc1:
                 code_display = p.get('project_code','') or '（待分配编号）'
                 st.write(f"{stage}{paid} **{p.get('brand_name','')}** — {code_display}")
-                _add_amt = float(p.get('add_amount', 0) or 0)
+                _add_amt = add_total(p)
                 _amt_show = float(p.get('amount', 0) or 0) + _add_amt
                 _amt_str = f"{p.get('currency','USD')} {_amt_show:,.2f}" + (f"（含追加 {_add_amt:,.2f}）" if _add_amt > 0 else "")
                 st.caption(f"{_amt_str} | {p.get('client_short','')} | 👤 {p.get('owner_name','') or '未指定'} | {closure} | {(p.get('created_at','') or '')[:10]}")

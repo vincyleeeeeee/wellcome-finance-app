@@ -397,6 +397,21 @@ def approve_project(project_id: int, finance_user_id: int, pdf_path: str) -> boo
     return True
 
 
+def add_total(p: Dict) -> float:
+    """追加款全额 = 预付款金额 add_amount ÷ 预付款比例 add_ratio（默认 0.5 = 50%）。
+    用于「项目总金额/收入」按追加全额口径汇总。"""
+    amt = float(p.get('add_amount', 0) or 0)
+    if amt <= 0:
+        return 0.0
+    try:
+        ratio = float(p.get('add_ratio', 0.5) or 0.5)
+    except (ValueError, TypeError):
+        ratio = 0.5
+    if ratio <= 0:
+        ratio = 0.5
+    return round(amt / ratio, 2)
+
+
 def approve_add_project(project_id: int, finance_user_id: int) -> bool:
     """通过追加款发票：只改 add_status，不动主发票 status（追加款是同一项目行的第二张发票）。
     同时把追加成本明细（add_cost_breakdown）并入主项目 cost_breakdown 同名明细，重算 estimated_cost。"""

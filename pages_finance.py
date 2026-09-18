@@ -7,7 +7,8 @@ import os, io, json, tempfile
 
 from utils.database import (
     get_projects, get_clients, get_client_by_id, get_pending_approvals,
-    approve_project, reject_project, approve_add_project, reject_add_project
+    approve_project, reject_project, approve_add_project, reject_add_project,
+    add_total
 )
 from utils.receipt_pdf import generate_receipt_pdf
 from utils.generate import generate_cash_receipt, invoice_amount, format_exec_period
@@ -88,7 +89,7 @@ def page_overview():
     received_partial = sum(1 for p in projects if not p.get('payment_received') and (p.get('received_amount', 0) or 0) > 0)
     closed_count = sum(1 for p in projects if p.get('closure_status') == 'closed')
     total_cost = sum(p.get('estimated_cost',0) or 0 for p in projects)
-    total_revenue = sum((p.get('amount',0) or 0) + (p.get('add_amount',0) or 0) for p in projects)
+    total_revenue = sum((p.get('amount',0) or 0) + add_total(p) for p in projects)
     total_received = sum((p.get('received_amount', 0) or 0) for p in projects)
     need_receipt = sum(1 for p in projects if (p.get('received_amount', 0) or 0) > 0 and p.get('status')=='approved')
     c1,c2,c3,c4,c5,c6,c7,c8 = st.columns(8)
@@ -149,7 +150,7 @@ def _render_table(projects):
     rows = []
     for seq_no, p in enumerate(projects, start=1):
         rcvd = p.get('received_amount', 0) or 0
-        total = p.get('amount', 0) or 0
+        total = (p.get('amount', 0) or 0) + add_total(p)
         remaining = max(total - rcvd, 0)
         if p.get('payment_received'):
             paid = '✅ 全款'
@@ -313,7 +314,7 @@ def _export_excel(projects):
         ws.cell(start_row,2,p.get('client_short',''))
         ws.cell(start_row,3,(p.get('project_name','') or '')[:35])
         ws.cell(start_row,4,p.get('project_code',''))
-        ws.cell(start_row,5,f"{p.get('currency','USD')} {p.get('amount',0):,.0f}")
+        ws.cell(start_row,5,f"{p.get('currency','USD')} {(p.get('amount',0) or 0) + add_total(p):,.0f}")
         ws.cell(start_row,6,exec_p)
         ws.cell(start_row,7,exp_p)
         ws.cell(start_row,10,total_cost)
